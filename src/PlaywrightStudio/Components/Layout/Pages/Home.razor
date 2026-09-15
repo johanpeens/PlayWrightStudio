@@ -1,0 +1,113 @@
+@page "/"
+@inject ScenarioStore Store
+@inject RunStore Runs
+@inject ManualStore Manuals
+@inject NavigationManager Nav
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Playwright Studio</PageTitle>
+
+<div class="home-head mb-6">
+    <img src="PlaywrightStudioLogo.svg" alt="" class="home-mark" />
+    <MudText Typo="Typo.h4">Playwright Studio</MudText>
+</div>
+
+<div class="tile-grid">
+    <MudTooltip Text="Open a browser and click through a journey - every action becomes a step"
+                Placement="Placement.Bottom" Arrow="true">
+        <button type="button" class="tile-shell" @onclick="NewAndRecord">
+            <MudPaper Outlined="true" Class="tile tile-lead">
+                <span class="tile-icon">@((MarkupString)LucideIcons.Record)</span>
+                <span class="tile-title">Record</span>
+            </MudPaper>
+        </button>
+    </MudTooltip>
+
+    <MudTooltip Text="Load a scenario someone exported, steps and checks intact"
+                Placement="Placement.Bottom" Arrow="true">
+        <button type="button" class="tile-shell" @onclick="ImportAsync">
+            <MudPaper Outlined="true" Class="tile">
+                <span class="tile-icon">@((MarkupString)LucideIcons.Import)</span>
+                <span class="tile-title">Import</span>
+            </MudPaper>
+        </button>
+    </MudTooltip>
+
+    @foreach (var tile in Tiles)
+    {
+        <MudTooltip Text="@tile.Hint" Placement="Placement.Bottom" Arrow="true">
+            <a href="@tile.Href" class="tile-shell">
+                <MudPaper Outlined="true" Class="tile">
+                    <span class="tile-icon">@((MarkupString)tile.Icon)</span>
+                    <span class="tile-title">@tile.Title</span>
+                    @if (tile.Count is { } count)
+                    {
+                        <span class="tile-count">@count</span>
+                    }
+                </MudPaper>
+            </a>
+        </MudTooltip>
+    }
+</div>
+
+@code {
+    private record Tile(string Title, string Icon, string Href, string Hint, int? Count = null);
+
+    private int _scenarioCount;
+    private int _runCount;
+    private int _manualCount;
+
+    protected override void OnInitialized() => Load();
+
+    private void Load()
+    {
+        _scenarioCount = Store.All().Count;
+        _runCount = Runs.Recent(200).Count;
+        _manualCount = Manuals.All().Count;
+    }
+
+    private IEnumerable<Tile> Tiles
+    {
+        get
+        {
+            yield return new Tile("Scenarios", LucideIcons.Scenarios, "/scenarios",
+                "Everything you have recorded, ready to replay or edit", _scenarioCount);
+            yield return new Tile("Runs", LucideIcons.Runs, "/runs",
+                "What passed, what broke and why - with screenshots", _runCount);
+            yield return new Tile("Manuals", LucideIcons.Manuals, "/manuals",
+                "Written instructions built from a run, downloadable as a pdf", _manualCount);
+            yield return new Tile("Settings", LucideIcons.Settings, "/settings",
+                "Browser, timeouts, video and where your files are kept");
+            yield return new Tile("Help", LucideIcons.Help, "/help",
+                "How recording, replay and manuals actually work");
+        }
+    }
+
+    private void NewAndRecord()
+    {
+        var scenario = new Scenario { Name = "Untitled scenario" };
+        Store.Save(scenario);
+        Nav.NavigateTo($"/scenario/{scenario.Id}?record=1");
+    }
+
+    private async Task ImportAsync()
+    {
+        var result = await Dialogs.ShowAsync<ImportDialog>("Import scenario json",
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var outcome = await result.Result;
+        if (outcome is { Canceled: false, Data: string json })
+        {
+            try
+            {
+                var imported = Store.Import(json);
+                Load();
+                Snackbar.Add($"Imported \"{imported.Name}\"", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Import failed: " + ex.Message, Severity.Error);
+            }
+        }
+    }
+}

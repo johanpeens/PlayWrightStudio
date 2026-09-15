@@ -1,0 +1,434 @@
+@page "/help"
+@inject StudioPaths Paths
+
+<PageTitle>How this works - Playwright Studio</PageTitle>
+
+@* ------------------------------------------------------------------ the promise *@
+
+<MudPaper Outlined="true" Class="help-hero pa-6 mb-6">
+    <MudText Typo="Typo.overline" Class="help-eyebrow">Playwright Studio</MudText>
+    <MudText Typo="Typo.h4" Class="mt-1 mb-2">Record a journey once. Use it forever.</MudText>
+    <MudText Typo="Typo.body1" Class="mud-text-secondary help-lede">
+        Click through a form in a real browser. The studio writes down what you did as steps you can
+        read and edit - then replays them on demand, proves what passed, and turns the same journey
+        into a written manual or a test file for your suite.
+    </MudText>
+
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <MudButton Href="/scenarios" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.FiberManualRecord">Record a scenario</MudButton>
+        <MudButton Href="/runs" Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.History">Past runs</MudButton>
+        <MudButton Href="/manuals" Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.MenuBook">Manuals</MudButton>
+        <MudButton Href="/settings" Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.Settings">Settings</MudButton>
+    </div>
+</MudPaper>
+
+@* --------------------------------------------------- the three stages, as a contents page *@
+
+<MudGrid Spacing="3" Class="mb-6">
+    @foreach (var stage in Stages)
+    {
+        <MudItem xs="12" sm="4">
+            <MudPaper Outlined="true" Class="pa-4 help-stage h-100">
+                <div class="d-flex align-center gap-2 mb-2">
+                    <span class="help-num">@stage.Number</span>
+                    <MudIcon Icon="@stage.Icon" Color="Color.Primary" Size="Size.Small" />
+                    <MudText Typo="Typo.subtitle1"><b>@stage.Title</b></MudText>
+                </div>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@stage.Summary</MudText>
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+@* ------------------------------------------------------------------ 1. record *@
+
+<div class="help-section">
+    <MudText Typo="Typo.overline" Class="help-eyebrow">Stage one</MudText>
+    <MudText Typo="Typo.h6" Class="mb-3">Recording a journey</MudText>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="7">
+            <MudPaper Outlined="true" Class="pa-4 h-100">
+                <MudTimeline TimelinePosition="TimelinePosition.Start">
+                    <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                        <MudText Typo="Typo.body2"><b>New &amp; record</b> on the scenarios page, or
+                            <b>Record more steps</b> inside a scenario you already have.</MudText>
+                    </MudTimelineItem>
+                    <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                        <MudText Typo="Typo.body2">A real browser opens with a small <b>REC</b> toolbar
+                            pinned bottom-right. That toolbar belongs to the studio - it lives in its own
+                            shadow root, so it is never part of your page and never becomes a step.</MudText>
+                    </MudTimelineItem>
+                    <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                        <MudText Typo="Typo.body2">Click, type, tick boxes, pick dropdowns. Steps appear
+                            in the studio live. Typing collapses into a single <i>Fill</i> per field rather
+                            than one step per keystroke.</MudText>
+                    </MudTimelineItem>
+                    <MudTimelineItem Color="Color.Default" Size="Size.Small">
+                        <MudText Typo="Typo.body2"><b>✔ Assert</b> in the toolbar (or <b>Add check</b> in
+                            the studio) puts you in pick mode: hover to highlight, click to record a check -
+                            visible, hidden, its text, its value, its checked state.</MudText>
+                    </MudTimelineItem>
+                    <MudTimelineItem Color="Color.Default" Size="Size.Small">
+                        <MudText Typo="Typo.body2"><b>⏸</b> pauses capture when you want to click around
+                            without recording it - signing in, say, or getting back to where you were.</MudText>
+                    </MudTimelineItem>
+                    <MudTimelineItem Color="Color.Success" Size="Size.Small">
+                        <MudText Typo="Typo.body2"><b>Stop &amp; keep</b> writes the steps into the
+                            scenario. Closing the browser window does the same - nothing is lost.</MudText>
+                    </MudTimelineItem>
+                </MudTimeline>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="5">
+            <MudPaper Outlined="true" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Write as you go</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Each step has a <b>description</b> box - plain English, in markdown, for whoever reads
+                    the manual later. Fill it in while you still remember why you clicked that. Anything
+                    you leave blank gets a sensible sentence written for it.
+                </MudText>
+            </MudPaper>
+
+            <MudPaper Outlined="true" Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Secrets</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Password fields are lifted into a variable automatically, so the step reads
+                    <code>{{password}}</code> rather than the secret. The value still sits in the scenario
+                    file in plain text - blank it before sharing.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@* ------------------------------------------------------------------ 2. replay *@
+
+<div class="help-section">
+    <MudText Typo="Typo.overline" Class="help-eyebrow">Stage two</MudText>
+    <MudText Typo="Typo.h6" Class="mb-3">Replaying it</MudText>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="4">
+            <MudPaper Outlined="true" Class="pa-4 h-100">
+                <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Primary" Class="mb-2" />
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Run</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Headless when you just want an answer, or with a window when you want to watch.
+                    Slow motion is in Settings.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Outlined="true" Class="pa-4 h-100">
+                <MudIcon Icon="@Icons.Material.Filled.OpenInBrowser" Color="Color.Primary" Class="mb-2" />
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Run in my own browser</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Switch this on in Settings and a run opens a tab in the browser you are already
+                    using - your logins, your cookies. A bar on the page shows progress with a
+                    <b>Stop</b> button, so you can let it fill a form to a point and carry on by hand.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Outlined="true" Class="pa-4 h-100">
+                <MudIcon Icon="@Icons.Material.Filled.FactCheck" Color="Color.Primary" Class="mb-2" />
+                <MudText Typo="Typo.subtitle2" Class="mb-1">What a run keeps</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Per-step status and timing, the failure message, screenshots, and optionally an
+                    mp4 video and a Playwright trace. It is all under <b>Runs</b>.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Outlined="true" Class="pa-4 mt-3">
+        <MudText Typo="Typo.subtitle2" Class="mb-2">When a step fails</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+            The page you replay against is never quite the page you recorded. Rather than a bare timeout,
+            a failed step says which of these it was:
+        </MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6">
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.SearchOff" IconColor="Color.Error">
+                        <b>Nothing matched.</b> The selector found no element at all.
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.VisibilityOff" IconColor="Color.Warning">
+                        <b>Matched, but hidden.</b> It is in the markup and not on screen.
+                    </MudListItem>
+                </MudList>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Layers" IconColor="Color.Warning">
+                        <b>Something covered it.</b> The overlay in the way is named for you.
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CropFree" IconColor="Color.Warning">
+                        <b>The frame never appeared.</b> The step is inside an iframe that did not load.
+                    </MudListItem>
+                </MudList>
+            </MudItem>
+        </MudGrid>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">
+            Before giving up, the runner tries the other selectors the recorder kept for that step, prefers
+            the first <i>visible</i> match over the first in the markup, follows tabs the journey opens, and
+            accepts browser dialogs.
+        </MudText>
+    </MudPaper>
+</div>
+
+@* ------------------------------------------------------------------ 3. reuse *@
+
+<div class="help-section">
+    <MudText Typo="Typo.overline" Class="help-eyebrow">Stage three</MudText>
+    <MudText Typo="Typo.h6" Class="mb-3">Getting something out of it</MudText>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="4">
+            <MudPaper Outlined="true" Class="pa-4 h-100">
+                <MudIcon Icon="@Icons.Material.Filled.MenuBook" Color="Color.Secondary" Class="mb-2" />
+                <MudText Typo="Typo.subtitle2" Class="mb-1">A written manual</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Draft one from any run: your descriptions, each step's screenshot. Edit the wording,
+                    reorder or drop steps, swap in your own pictures, then download a PDF. Saved manuals
+                    live under <b>Manuals</b> and outlive the run they came from.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Outlined="true" Class="pa-4 h-100">
+                <MudIcon Icon="@Icons.Material.Filled.Code" Color="Color.Secondary" Class="mb-2" />
+                <MudText Typo="Typo.subtitle2" Class="mb-1">A real test file</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Export as an NUnit C# fixture, a <code>@("@playwright/test")</code> spec, or a pytest
+                    test - runnable files for your own suite. The scenario json round-trips through Import
+                    on another machine.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Outlined="true" Class="pa-4 h-100">
+                <MudIcon Icon="@Icons.Material.Filled.PhotoCamera" Color="Color.Secondary" Class="mb-2" />
+                <MudText Typo="Typo.subtitle2" Class="mb-1">A copy of the site</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    The camera on a scenario card saves every distinct page the journey reaches - full-page
+                    screenshot plus its html - into a folder you choose, with a <code>pages.md</code> index.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@* ------------------------------------------------------------------ reference *@
+
+<div class="help-section">
+    <MudText Typo="Typo.overline" Class="help-eyebrow">Reference</MudText>
+    <MudText Typo="Typo.h6" Class="mb-3">Look it up</MudText>
+
+    <MudPaper Outlined="true" Class="pa-2">
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Class="help-tabs">
+
+            <MudTabPanel Text="Selectors" Icon="@Icons.Material.Filled.MyLocation">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+                    For every element the recorder generates candidates and keeps only those matching
+                    exactly one element, best first. Framework-generated ids rank <i>below</i> role and
+                    text, because they do not survive a re-render.
+                </MudText>
+                <MudSimpleTable Dense="true" Class="help-table">
+                    <thead>
+                        <tr><th style="width:2.5rem"></th><th>Looks like</th><th>Why</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="help-rank">1</td>
+                            <td class="mono">[data-testid="save"]</td>
+                            <td class="mud-text-secondary">Put there to be tested against. Always wins.</td>
+                        </tr>
+                        <tr>
+                            <td class="help-rank">2</td>
+                            <td class="mono">#email</td>
+                            <td class="mud-text-secondary">An id a person chose, not one a framework generated.</td>
+                        </tr>
+                        <tr>
+                            <td class="help-rank">3</td>
+                            <td class="mono">input[name="email"]</td>
+                            <td class="mud-text-secondary">Form attributes - also aria-label and placeholder.</td>
+                        </tr>
+                        <tr>
+                            <td class="help-rank">4</td>
+                            <td class="mono">role=button[name="Save"]</td>
+                            <td class="mud-text-secondary">What the user sees. Survives a redesign.</td>
+                        </tr>
+                        <tr>
+                            <td class="help-rank">5</td>
+                            <td class="mono">#mudinput08267ls7</td>
+                            <td class="mud-text-secondary">A generated id. Works today, gone next render.</td>
+                        </tr>
+                        <tr>
+                            <td class="help-rank">6</td>
+                            <td class="mono">form &gt; div:nth-child(3) &gt; input</td>
+                            <td class="mud-text-secondary">A css path. Last resort, breaks easily.</td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-3">
+                    Every alternative is kept on the step - open a step and click a chip to swap. While the
+                    recorder is live, the crosshair button highlights that selector in the real browser and
+                    tells you how many elements it matched.
+                </MudText>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Step actions" Icon="@Icons.Material.Filled.PlaylistAdd">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+                    Everything the recorder can produce, and everything you can add by hand.
+                </MudText>
+                <MudGrid Spacing="3">
+                    @foreach (var group in ActionGroups)
+                    {
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">@group.Title</MudText>
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach (var action in group.Actions)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                             Color="@group.Color">@action</MudChip>
+                                }
+                            </div>
+                        </MudItem>
+                    }
+                </MudGrid>
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Per step you can also set a timeout, a delay before it runs, <i>carry on if this fails</i>,
+                    <i>screenshot after this step</i>, and whether it appears in the manual.
+                </MudText>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Assertions" Icon="@Icons.Material.Filled.CheckCircle">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+                    How the expected value in a check is matched.
+                </MudText>
+                <MudSimpleTable Dense="true" Class="help-table">
+                    <thead><tr><th>You write</th><th>It means</th></tr></thead>
+                    <tbody>
+                        <tr><td class="mono">Welcome back</td><td class="mud-text-secondary">contains, ignoring case - the default</td></tr>
+                        <tr><td class="mono">=Welcome back</td><td class="mud-text-secondary">exactly this, nothing more</td></tr>
+                        <tr><td class="mono">/order-\d+/</td><td class="mud-text-secondary">a regular expression</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-3">
+                    Assertions retry until the step's timeout, so a slow render fails nothing.
+                </MudText>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Variables" Icon="@Icons.Material.Filled.DataObject">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+                    Write <code>{{name}}</code> in any value - or in a selector. Define your own in the
+                    scenario's Variables panel; these need no defining.
+                </MudText>
+                <MudSimpleTable Dense="true" Class="help-table">
+                    <tbody>
+                        <tr><td class="mono">{{guid}}</td><td class="mud-text-secondary">a fresh guid</td></tr>
+                        <tr><td class="mono">{{now}}</td><td class="mud-text-secondary">yyyy-MM-dd HH:mm:ss</td></tr>
+                        <tr><td class="mono">{{now:HH\:mm}}</td><td class="mud-text-secondary">your own format</td></tr>
+                        <tr><td class="mono">{{today}}</td><td class="mud-text-secondary">yyyy-MM-dd</td></tr>
+                        <tr><td class="mono">{{random:6}}</td><td class="mud-text-secondary">6 random digits</td></tr>
+                        <tr><td class="mono">{{randomtext:8}}</td><td class="mud-text-secondary">8 random letters</td></tr>
+                        <tr><td class="mono">{{randomemail}}</td><td class="mud-text-secondary">test+123456@@example.com</td></tr>
+                        <tr><td class="mono">{{timestamp}}</td><td class="mud-text-secondary">unix milliseconds</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-3">
+                    Use one for anything that must be unique per run - an email address, a reference - so the
+                    same scenario can run twice without colliding with itself.
+                </MudText>
+            </MudTabPanel>
+
+        </MudTabs>
+    </MudPaper>
+</div>
+
+@* ------------------------------------------------------------------ the small print *@
+
+<div class="help-section">
+    <MudText Typo="Typo.overline" Class="help-eyebrow">Good to know</MudText>
+    <MudText Typo="Typo.h6" Class="mb-3">Where it stops, and where it keeps things</MudText>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="7">
+            <MudPaper Outlined="true" Class="pa-4 h-100">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Things it cannot do</MudText>
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Warning" IconColor="Color.Warning">
+                        A <b>cross-origin iframe</b> cannot see the tag holding it, so the recorder names it
+                        by its own name or url. A frame with neither falls back to the first iframe on the page.
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Warning" IconColor="Color.Warning">
+                        <b>File uploads</b> record the file's name only - put the full path on the step before
+                        replaying.
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Warning" IconColor="Color.Warning">
+                        <b>Canvas</b> and custom-drawn widgets have nothing to select. Add a check by hand.
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Warning" IconColor="Color.Warning">
+                        <b>One recording at a time</b> - the studio owns a single browser.
+                    </MudListItem>
+                </MudList>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="5">
+            <MudPaper Outlined="true" Class="pa-4 h-100">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Where things are kept</MudText>
+                <code class="d-block mono help-path">@Paths.Root</code>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">
+                    Scenarios, runs, screenshots, manuals and your settings. Scenario files are plain json,
+                    so they are worth committing next to the app they test.
+                </MudText>
+                <MudButton Href="/settings" Variant="Variant.Text" Size="Size.Small" Class="mt-2"
+                           StartIcon="@Icons.Material.Filled.DriveFileMove">Change this folder</MudButton>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@code {
+    private record Stage(string Number, string Icon, string Title, string Summary);
+
+    private static readonly Stage[] Stages =
+    {
+        new("1", Icons.Material.Filled.FiberManualRecord, "Record",
+            "Click through the journey in a real browser. Every action becomes a step you can read."),
+        new("2", Icons.Material.Filled.PlayArrow, "Replay",
+            "Run it whenever you like - headless, watched, or right inside the browser you are using."),
+        new("3", Icons.Material.Filled.IosShare, "Reuse",
+            "Turn the same journey into a PDF manual, a test file for your suite, or a copy of the site.")
+    };
+
+    private record ActionGroup(string Title, Color Color, string[] Actions);
+
+    private static readonly ActionGroup[] ActionGroups =
+    {
+        new("Do something", Color.Primary, new[]
+        {
+            "Navigate", "Click", "DoubleClick", "RightClick", "Fill", "Type", "Press",
+            "Select", "Check", "Uncheck", "Hover", "Upload", "Focus", "ScrollIntoView"
+        }),
+        new("Wait", Color.Info, new[]
+        {
+            "WaitForSelector", "WaitForHidden", "WaitForUrl", "WaitForTimeout"
+        }),
+        new("Check", Color.Success, new[]
+        {
+            "AssertVisible", "AssertHidden", "AssertText", "AssertValue",
+            "AssertChecked", "AssertUrl", "AssertTitle", "AssertCount"
+        }),
+        new("Everything else", Color.Default, new[] { "Screenshot", "Comment" })
+    };
+}

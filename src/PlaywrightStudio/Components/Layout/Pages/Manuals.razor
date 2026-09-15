@@ -1,0 +1,123 @@
+﻿@page "/manuals"
+@inject ManualStore Store
+@inject NavigationManager Nav
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Manuals - Playwright Studio</PageTitle>
+
+<div class="d-flex align-center mb-3 flex-wrap gap-2">
+    <div>
+        <MudText Typo="Typo.h5">Manuals</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Written guides, illustrated from a run and then edited by hand.
+        </MudText>
+    </div>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="CreateBlank">
+        Blank manual
+    </MudButton>
+</div>
+
+@if (_manuals.Count == 0)
+{
+    <MudPaper Outlined="true" Class="pa-10 d-flex flex-column align-center">
+        <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Large" Class="mb-3 mud-text-secondary" />
+        <MudText Typo="Typo.h6">No manuals yet</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4" Style="max-width:46ch;text-align:center">
+            Run a scenario, open the run, and press <b>User manual</b>. You get a draft with a
+            screenshot per step, ready to rewrite.
+        </MudText>
+        <MudButton Variant="Variant.Text" Href="/runs" EndIcon="@Icons.Material.Filled.ArrowForward">
+            Go to runs
+        </MudButton>
+    </MudPaper>
+}
+else
+{
+    <MudGrid Spacing="3" Class="card-row">
+        @foreach (var manual in _manuals)
+        {
+            var m = manual;
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Outlined="true" Class="pa-4 h-100 d-flex flex-column scenario-card"
+                          Style="cursor:pointer" @onclick="@(() => Open(m.Id))">
+                    <div class="d-flex align-start">
+                        <div class="flex-grow-1" style="min-width:0">
+                            <MudText Typo="Typo.subtitle1" Class="text-truncate">@m.Title</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                updated @m.UpdatedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                            </MudText>
+                        </div>
+                        <div @onclick:stopPropagation="true">
+                            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
+                                     AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                                <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="@(() => Open(m.Id))">Open</MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.ContentCopy" OnClick="@(() => Duplicate(m))">Duplicate</MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeleteAsync(m))">Delete</MudMenuItem>
+                            </MudMenu>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(m.Intro))
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-2 mud-text-secondary two-lines">@m.Intro</MudText>
+                    }
+
+                    <MudSpacer />
+
+                    <div class="d-flex align-center gap-2 mt-3 flex-wrap">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 Icon="@Icons.Material.Filled.FormatListNumbered">
+                            @m.IncludedCount step@(m.IncludedCount == 1 ? "" : "s")
+                        </MudChip>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 Color="@(m.WithPictures == m.IncludedCount ? Color.Success : Color.Warning)"
+                                 Icon="@Icons.Material.Filled.Image">
+                            @m.WithPictures illustrated
+                        </MudChip>
+                    </div>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<Manual> _manuals = new();
+
+    protected override void OnInitialized() => Load();
+
+    private void Load() => _manuals = Store.All().ToList();
+
+    private void Open(string id) => Nav.NavigateTo($"/manuals/{id}");
+
+    private void CreateBlank()
+    {
+        var manual = new Manual { Title = "Untitled manual" };
+        manual.Steps.Add(new ManualStep { Text = "Describe the first thing the reader should do." });
+        Store.Save(manual);
+        Open(manual.Id);
+    }
+
+    private void Duplicate(Manual manual)
+    {
+        var copy = Store.Duplicate(manual);
+        Load();
+        Snackbar.Add($"Copied to \"{copy.Title}\"", Severity.Success);
+    }
+
+    private async Task DeleteAsync(Manual manual)
+    {
+        var dialog = await Dialogs.ShowAsync<ConfirmDialog>("Delete manual",
+            new DialogParameters<ConfirmDialog>
+            {
+                { x => x.Message, $"Delete \"{manual.Title}\" and its pictures? The run it came from is untouched." }
+            });
+        if ((await dialog.Result) is not { Canceled: false }) return;
+
+        Store.Delete(manual.Id);
+        Load();
+        Snackbar.Add("Manual deleted", Severity.Normal);
+    }
+}

@@ -1,0 +1,52 @@
+name: Bug report
+description: Something recorded or replayed wrongly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The most useful thing you can give is **the page it happened on**. A selector that works
+        everywhere except one framework's date picker is the normal shape of a bug here.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, and what the studio did instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: page
+    attributes:
+      label: The page
+      description: >
+        A url if it is public. If not, the HTML of the element involved - right-click the element,
+        Inspect, then copy the outer HTML.
+    validations:
+      required: true
+
+  - type: textarea
+    id: step
+    attributes:
+      label: The step, if there is one
+      description: >
+        Open the step in the editor and paste the action, selector and value. The failure message
+        from the run report helps too.
+      render: text
+
+  - type: input
+    id: browser
+    attributes:
+      label: Engine
+      placeholder: Chromium / Chrome / Edge / Firefox / WebKit
+
+  - type: checkboxes
+    id: mode
+    attributes:
+      label: How it was running
+      options:
+        - label: Recording
+        - label: Replaying headless
+        - label: Replaying with a window
+        - label: Replaying inside my own browser

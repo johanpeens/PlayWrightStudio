@@ -1,0 +1,295 @@
+﻿@page "/scenarios"
+@inject ScenarioStore Store
+@inject RunStore Runs
+@inject NavigationManager Nav
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject PlaywrightHost Host
+@inject SettingsService Settings
+@inject StudioPaths Paths
+
+<PageTitle>Scenarios - Playwright Studio</PageTitle>
+
+<div class="d-flex align-center mb-3 flex-wrap gap-2">
+    <div>
+        <MudText Typo="Typo.h5">Scenarios</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            Record a click-through once, replay it whenever you like.
+        </MudText>
+    </div>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.UploadFile" OnClick="ImportAsync">Import</MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FiberManualRecord"
+               OnClick="NewAndRecord">New &amp; record</MudButton>
+</div>
+
+@* Search gets the full width of the page, directly under the heading. Width lives on a plain
+   style here - a flex shorthand inside MudTextField's Style becomes a height. *@
+<MudTextField @bind-Value="_filter" Placeholder="Search scenarios by name, url or notes…"
+              Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Clearable="true"
+              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+              Style="width:100%" Class="mb-4" />
+
+@if (!string.IsNullOrWhiteSpace(_filter))
+{
+    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mb-3">
+        @Filtered.Count() of @_scenarios.Count scenario@(_scenarios.Count == 1 ? "" : "s") match “@_filter”
+    </MudText>
+}
+
+@if (_browserWarning is not null)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4" Dense="true"
+              ContentAlignment="HorizontalAlignment.Left">
+        <div class="d-flex align-center gap-4 flex-wrap">
+            <span>@_browserWarning</span>
+            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Warning" Href="/settings">
+                Install browsers
+            </MudButton>
+        </div>
+    </MudAlert>
+}
+
+@if (_scenarios.Count == 0)
+{
+    <MudPaper Class="pa-10 d-flex flex-column align-center" Outlined="true">
+        <MudIcon Icon="@Icons.Material.Filled.Theaters" Size="Size.Large" Class="mb-3 mud-text-secondary" />
+        <MudText Typo="Typo.h6">No scenarios yet</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            Hit <b>New &amp; record</b>, give it a URL, and click through your form. Every click, keystroke and
+            dropdown becomes a step you can edit, replay and export.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.FiberManualRecord" OnClick="NewAndRecord">
+            Record my first scenario
+        </MudButton>
+    </MudPaper>
+}
+else if (!Filtered.Any())
+{
+    <MudPaper Class="pa-8 d-flex flex-column align-center" Outlined="true">
+        <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Class="mb-2 mud-text-secondary" />
+        <MudText Typo="Typo.body1">Nothing matches “@_filter”</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+            Searching names, start urls and notes across @_scenarios.Count scenario@(_scenarios.Count == 1 ? "" : "s").
+        </MudText>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Close"
+                   OnClick="@(() => _filter = "")">Clear search</MudButton>
+    </MudPaper>
+}
+else
+{
+    <MudGrid Spacing="3" Class="card-row">
+        @foreach (var s in Filtered)
+        {
+            var last = _lastRuns.GetValueOrDefault(s.Id);
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Outlined="true" Class="pa-4 h-100 d-flex flex-column scenario-card"
+                          Style="cursor:pointer" @onclick="@(() => Open(s.Id))">
+                    <div class="d-flex align-start">
+                        <div class="flex-grow-1" style="min-width:0">
+                            <MudText Typo="Typo.subtitle1" Class="text-truncate">@s.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary text-truncate d-block">
+                                @(string.IsNullOrWhiteSpace(s.StartUrl) ? "no start url" : s.StartUrl)
+                            </MudText>
+                        </div>
+                        <div @onclick:stopPropagation="true">
+                            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
+                                     AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                                <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="@(() => Open(s.Id))">Open</MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.ContentCopy" OnClick="@(() => Duplicate(s))">Duplicate</MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.Code" OnClick="@(() => ExportAsync(s))">Export code</MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeleteAsync(s))">Delete</MudMenuItem>
+                            </MudMenu>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(s.Description))
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-2 mud-text-secondary two-lines">@s.Description</MudText>
+                    }
+
+                    <MudSpacer />
+
+                    <div class="d-flex align-center gap-2 mt-3 flex-wrap">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 Icon="@Icons.Material.Filled.FormatListNumbered">
+                            @s.EnabledStepCount step@(s.EnabledStepCount == 1 ? "" : "s")
+                        </MudChip>
+                        @{
+                            var asserts = s.Steps.Count(x => x.Enabled && x.Action.IsAssertion());
+                        }
+                        @if (asserts > 0)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary"
+                                     Icon="@Icons.Material.Filled.CheckCircleOutline">@asserts check@(asserts == 1 ? "" : "s")</MudChip>
+                        }
+                        @if (last is not null)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                     Color="@(last.Status == RunStatus.Passed ? Color.Success : last.Status == RunStatus.Failed ? Color.Error : Color.Default)">
+                                @last.Status.ToString().ToLowerInvariant()
+                            </MudChip>
+                        }
+                    </div>
+                    <div class="d-flex align-center mt-2">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            updated @s.UpdatedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                        </MudText>
+                        <MudSpacer />
+                        <div @onclick:stopPropagation="true">
+                            <MudTooltip Text="@(s.CaptureForDuplication
+                                ? $"Capturing pages to {s.CaptureFolder}. Click to stop."
+                                : "Capture every page this run visits - screenshot + html - for site duplication")">
+                                <MudToggleIconButton Toggled="s.CaptureForDuplication"
+                                                     ToggledChanged="@(v => ToggleCaptureAsync(s, v))"
+                                                     Icon="@Icons.Material.Outlined.PhotoCamera" Color="Color.Default"
+                                                     ToggledIcon="@Icons.Material.Filled.PhotoCamera"
+                                                     ToggledColor="Color.Tertiary" Size="Size.Small" />
+                            </MudTooltip>
+                        </div>
+                    </div>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<Scenario> _scenarios = new();
+    private Dictionary<string, RunResult> _lastRuns = new();
+    private string _filter = "";
+    private string? _browserWarning;
+
+    private IEnumerable<Scenario> Filtered =>
+        string.IsNullOrWhiteSpace(_filter)
+            ? _scenarios
+            : _scenarios.Where(s =>
+                s.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
+                (s.StartUrl?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (s.Description?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    protected override void OnInitialized() => Load();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        var (ok, message) = await Host.ProbeAsync(Settings.Current);
+        if (!ok)
+        {
+            _browserWarning = $"Playwright cannot start {Settings.Current.Browser}: {Trim(message)}";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string Trim(string s) => s.Length > 180 ? s[..180] + "…" : s;
+
+    private void Load()
+    {
+        _scenarios = Store.All().ToList();
+        _lastRuns = new Dictionary<string, RunResult>();
+        foreach (var run in Runs.Recent(200))
+            _lastRuns.TryAdd(run.ScenarioId, run);
+    }
+
+    private void Open(string id) => Nav.NavigateTo($"/scenario/{id}");
+
+    private async Task ToggleCaptureAsync(Scenario scenario, bool on)
+    {
+        if (!on)
+        {
+            scenario.CaptureForDuplication = false;
+            Store.Save(scenario);
+            Snackbar.Add($"\"{scenario.Name}\" will no longer capture pages", Severity.Normal);
+            return;
+        }
+
+        var slug = CodeExporter.Slug(scenario.Name);
+        var suggested = string.IsNullOrWhiteSpace(scenario.CaptureFolder)
+            ? Path.Combine(Paths.Captures, slug)
+            : scenario.CaptureFolder!;
+
+        var picks = new List<(string Label, string Path)>
+        {
+            ("Beside the app", Path.Combine(Paths.Captures, slug)),
+            ("Data folder", Path.Combine(Paths.Root, "captures", slug)),
+            ("Documents", Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "PlaywrightStudio", slug))
+        };
+
+        var result = await Dialogs.ShowAsync<CaptureFolderDialog>("Where should captured pages go?",
+            new DialogParameters<CaptureFolderDialog>
+            {
+                { x => x.ScenarioName, scenario.Name },
+                { x => x.Folder, suggested },
+                { x => x.Picks, picks }
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if ((await result.Result) is not { Canceled: false, Data: string chosen })
+        {
+            StateHasChanged();          // put the toggle back where it was
+            return;
+        }
+
+        scenario.CaptureForDuplication = true;
+        scenario.CaptureFolder = chosen;
+        Store.Save(scenario);
+        Snackbar.Add($"\"{scenario.Name}\" will capture pages to {chosen}", Severity.Success);
+    }
+
+    private void NewAndRecord()
+    {
+        var scenario = new Scenario { Name = "Untitled scenario" };
+        Store.Save(scenario);
+        Nav.NavigateTo($"/scenario/{scenario.Id}?record=1");
+    }
+
+    private void Duplicate(Scenario s)
+    {
+        var copy = s.Clone();
+        Store.Save(copy);
+        Load();
+        Snackbar.Add($"Copied to \"{copy.Name}\"", Severity.Success);
+    }
+
+    private async Task ExportAsync(Scenario s)
+    {
+        var parameters = new DialogParameters<ExportDialog> { { x => x.Scenario, s } };
+        await Dialogs.ShowAsync<ExportDialog>("Export " + s.Name, parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+    }
+
+    private async Task DeleteAsync(Scenario s)
+    {
+        var dialog = await Dialogs.ShowAsync<ConfirmDialog>("Delete scenario",
+            new DialogParameters<ConfirmDialog>
+            {
+                { x => x.Message, $"Delete \"{s.Name}\" and its {s.Steps.Count} steps? Runs already recorded are kept." }
+            });
+        if ((await dialog.Result) is not { Canceled: false }) return;
+        Store.Delete(s.Id);
+        Load();
+        Snackbar.Add("Scenario deleted", Severity.Normal);
+    }
+
+    private async Task ImportAsync()
+    {
+        var result = await Dialogs.ShowAsync<ImportDialog>("Import scenario json",
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var outcome = await result.Result;
+        if (outcome is { Canceled: false, Data: string json })
+        {
+            try
+            {
+                var imported = Store.Import(json);
+                Load();
+                Snackbar.Add($"Imported \"{imported.Name}\"", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Import failed: " + ex.Message, Severity.Error);
+            }
+        }
+    }
+}

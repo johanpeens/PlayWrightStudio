@@ -1,0 +1,128 @@
+﻿@page "/runs"
+@inject RunStore Store
+@inject NavigationManager Nav
+@inject IDialogService Dialogs
+
+<PageTitle>Runs - Playwright Studio</PageTitle>
+
+<div class="d-flex align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5">Runs</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">Every replay, with its screenshots and failures.</MudText>
+    </div>
+    <MudSpacer />
+    @if (_runs.Count > 0)
+    {
+        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteSweep"
+                   OnClick="ClearAsync">Clear history</MudButton>
+    }
+</div>
+
+@if (_runs.Count == 0)
+{
+    <MudPaper Outlined="true" Class="pa-10 d-flex flex-column align-center">
+        <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Class="mb-3 mud-text-secondary" />
+        <MudText Typo="Typo.h6">No runs yet</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4 text-center" Style="max-width:40em">
+            Open a scenario and press <b>Run</b>. Every replay lands here with its result, timings,
+            screenshots and, when you ask for them, a video and a trace.
+        </MudText>
+        <MudButton Href="/scenarios" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.ListAlt">Go to scenarios</MudButton>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Outlined="true">
+        <MudSimpleTable Dense="true" Hover="true">
+            <thead>
+                <tr>
+                    <th style="width:90px">Result</th>
+                    <th>Scenario</th>
+                    <th style="width:140px">Steps</th>
+                    <th style="width:100px">Duration</th>
+                    <th style="width:120px">Browser</th>
+                    <th style="width:170px">When</th>
+                    <th style="width:60px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var run in _runs)
+                {
+                    var r = run;
+                    <tr style="cursor:pointer" @onclick="@(() => Nav.NavigateTo($"/runs/{r.Id}"))">
+                        <td>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@Colour(r.Status)">
+                                @r.Status.ToString().ToLowerInvariant()
+                            </MudChip>
+                        </td>
+                        @* A real link as well as the row click: the report has a url, so it should
+                           be reachable by keyboard and openable in a new tab. *@
+                        <td><a class="row-link" href="@($"/runs/{r.Id}")" @onclick:stopPropagation="true">@r.ScenarioName</a></td>
+                        <td class="mud-text-secondary">
+                            @r.Passed passed@(r.Failed > 0 ? $", {r.Failed} failed" : "")@(r.Skipped > 0 ? $", {r.Skipped} skipped" : "")
+                        </td>
+                        <td class="mud-text-secondary">@($"{r.Duration.TotalSeconds:0.0}") s</td>
+                        <td class="mud-text-secondary">@r.Browser @(r.Headless ? "(headless)" : "")</td>
+                        <td class="mud-text-secondary">@r.StartedUtc.ToLocalTime().ToString("dd MMM HH:mm:ss")</td>
+                        <td @onclick:stopPropagation="true">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                           title="Delete this run"
+                                           OnClick="@(() => DeleteAsync(r))" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+}
+
+@code {
+    private List<RunResult> _runs = new();
+
+    protected override void OnInitialized() => Load();
+
+    private void Load() => _runs = Store.Recent(100).ToList();
+
+    /// <summary>
+    /// This bin sits inside a row that navigates, so a misclick is easy - and a run takes its
+    /// screenshots, video and trace with it. Ask first, the same as Clear history does.
+    /// </summary>
+    private async Task DeleteAsync(RunResult run)
+    {
+        var when = run.StartedUtc.ToLocalTime().ToString("dd MMM HH:mm");
+        var dialog = await Dialogs.ShowAsync<ConfirmDialog>("Delete run",
+            new DialogParameters<ConfirmDialog>
+            {
+                { x => x.Message, $"Delete the {run.Status.ToString().ToLowerInvariant()} run of "
+                                  + $"\"{run.ScenarioName}\" from {when}, with its screenshots and trace? "
+                                  + "The scenario itself is not touched." },
+                { x => x.ConfirmText, "Delete run" }
+            });
+        if ((await dialog.Result) is not { Canceled: false }) return;
+
+        Store.Delete(run.Id);
+        Load();
+    }
+
+    private async Task ClearAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<ConfirmDialog>("Clear run history",
+            new DialogParameters<ConfirmDialog>
+            {
+                { x => x.Message, "Delete every run, including screenshots and traces? Scenarios are not touched." },
+                { x => x.ConfirmText, "Delete all" }
+            });
+        if ((await dialog.Result) is not { Canceled: false }) return;
+        Store.DeleteAll();
+        Load();
+    }
+
+    private static Color Colour(RunStatus status) => status switch
+    {
+        RunStatus.Passed => Color.Success,
+        RunStatus.Failed => Color.Error,
+        RunStatus.Aborted => Color.Warning,
+        _ => Color.Default
+    };
+}

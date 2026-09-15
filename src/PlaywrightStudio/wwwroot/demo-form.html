@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Demo signup form - Playwright Studio</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 "Segoe UI", system-ui, sans-serif; background: #f4f6fa; color: #1d2430; }
+  .wrap { max-width: 620px; margin: 40px auto; padding: 0 20px 60px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: #6b7688; margin: 0 0 28px; }
+  .card { background: #fff; border: 1px solid #e2e7ef; border-radius: 12px; padding: 26px; box-shadow: 0 2px 10px rgba(20,30,50,.05); }
+  label { display: block; font-weight: 600; font-size: .86rem; margin: 16px 0 5px; }
+  input[type=text], input[type=email], input[type=password], input[type=tel], select, textarea {
+    width: 100%; padding: 9px 11px; border: 1px solid #ccd4e0; border-radius: 7px; font: inherit; background: #fff;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #4f9cf9; outline-offset: 1px; border-color: #4f9cf9; }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  .check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-weight: 400; font-size: .9rem; }
+  .check input { width: auto; }
+  fieldset { border: 1px solid #e2e7ef; border-radius: 8px; margin: 18px 0 0; padding: 12px 14px; }
+  legend { font-weight: 600; font-size: .82rem; padding: 0 6px; }
+  button { margin-top: 22px; background: #2563eb; color: #fff; border: 0; border-radius: 8px;
+           padding: 11px 20px; font: 600 15px/1 inherit; cursor: pointer; }
+  button:hover { background: #1d4ed8; }
+  button.ghost { background: #eef2f8; color: #37415a; margin-left: 8px; }
+  .error { color: #c0243c; font-size: .82rem; margin-top: 5px; display: none; }
+  .error.show { display: block; }
+  #success { display: none; margin-top: 22px; background: #e8f8f0; border: 1px solid #a9e0c6;
+             color: #14603f; border-radius: 9px; padding: 16px 18px; }
+  #success.show { display: block; }
+  .muted { color: #6b7688; font-size: .82rem; margin-top: 22px; }
+  code { background: #eef2f8; padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Create your account</h1>
+  <p class="sub">A throwaway form for practising with Playwright Studio.</p>
+
+  <div class="card">
+    <form id="signup" novalidate>
+      <div class="row">
+        <div>
+          <label for="firstName">First name</label>
+          <input type="text" id="firstName" name="firstName" placeholder="Jane" />
+        </div>
+        <div>
+          <label for="lastName">Last name</label>
+          <input type="text" id="lastName" name="lastName" placeholder="Doe" />
+        </div>
+      </div>
+
+      <label for="email">Email address</label>
+      <input type="email" id="email" name="email" placeholder="jane@example.com" />
+      <div class="error" id="emailError">That does not look like an email address.</div>
+
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" />
+      <div class="error" id="passwordError">Use at least 8 characters.</div>
+
+      <label for="phone">Phone</label>
+      <input type="tel" id="phone" name="phone" placeholder="+27 82 000 0000" />
+
+      <label for="country">Country</label>
+      <select id="country" name="country">
+        <option value="">Choose one…</option>
+        <option value="za">South Africa</option>
+        <option value="uk">United Kingdom</option>
+        <option value="us">United States</option>
+        <option value="au">Australia</option>
+      </select>
+
+      <fieldset>
+        <legend>Plan</legend>
+        <label class="check"><input type="radio" name="plan" value="free" checked /> Free</label>
+        <label class="check"><input type="radio" name="plan" value="pro" /> Pro - R199 / month</label>
+        <label class="check"><input type="radio" name="plan" value="team" /> Team - R799 / month</label>
+      </fieldset>
+
+      <label for="notes">Anything we should know?</label>
+      <textarea id="notes" name="notes" rows="3" placeholder="Optional"></textarea>
+
+      <label class="check">
+        <input type="checkbox" id="newsletter" name="newsletter" /> Email me product updates
+      </label>
+      <label class="check">
+        <input type="checkbox" id="terms" name="terms" data-testid="accept-terms" /> I accept the terms
+      </label>
+      <div class="error" id="termsError">You have to accept the terms.</div>
+
+      <button type="submit" data-testid="submit-signup">Create account</button>
+      <button type="button" class="ghost" id="resetBtn">Reset</button>
+    </form>
+
+    <div id="success" data-testid="signup-success">
+      <strong>Account created.</strong>
+      <div id="successDetail"></div>
+    </div>
+  </div>
+
+  <p class="muted">
+    Handy targets: <code>[data-testid="submit-signup"]</code>, <code>#email</code>,
+    <code>select[name="country"]</code>, <code>[data-testid="signup-success"]</code>.
+  </p>
+</div>
+
+<script>
+  const form = document.getElementById('signup');
+  const success = document.getElementById('success');
+
+  function show(id, on) { document.getElementById(id).classList.toggle('show', on); }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const terms = document.getElementById('terms').checked;
+
+    const badEmail = !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+    const badPassword = password.length < 8;
+
+    show('emailError', badEmail);
+    show('passwordError', badPassword);
+    show('termsError', !terms);
+    if (badEmail || badPassword || !terms) return;
+
+    const name = document.getElementById('firstName').value.trim() || 'friend';
+    const plan = (form.querySelector('input[name="plan"]:checked') || {}).value || 'free';
+    document.getElementById('successDetail').textContent =
+      `Welcome ${name}. You are on the ${plan} plan, and we will mail ${email}.`;
+    success.classList.add('show');
+    form.style.display = 'none';
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    form.reset();
+    ['emailError', 'passwordError', 'termsError'].forEach(id => show(id, false));
+    success.classList.remove('show');
+    form.style.display = '';
+  });
+</script>
+</body>
+</html>

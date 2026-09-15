@@ -1,0 +1,762 @@
+﻿@page "/scenario/{Id}"
+@inject ScenarioStore Store
+@inject RecorderService Recorder
+@inject RunnerService Runner
+@inject SettingsService Settings
+@inject NavigationManager Nav
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<PageTitle>@(_scenario?.Name ?? "Scenario") - Playwright Studio</PageTitle>
+
+@if (_scenario is null)
+{
+    <MudAlert Severity="Severity.Error">That scenario no longer exists. <MudLink Href="/scenarios">Back to the list</MudLink></MudAlert>
+}
+else
+{
+    <div class="d-flex align-center gap-2 mb-3 flex-wrap">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/scenarios" title="Back to scenarios" />
+        @* Everything else on this page saves itself; these three used to need the Save button,
+           so renaming a scenario and navigating away quietly lost the rename. Debounced so a
+           long name is one write rather than one per keystroke. *@
+        <MudTextField T="string" Value="_scenario.Name" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Label="Scenario name" Style="max-width:320px" Immediate="true" DebounceInterval="600"
+                      ValueChanged="@(v => { _scenario.Name = v; Save(silent: true); })" />
+        @* The flex sizing lives on a wrapper: a flex shorthand in MudTextField's own Style
+           lands inside its column-flex input control and becomes a height. *@
+        <div style="flex:1 1 320px;min-width:240px;max-width:560px">
+            <MudTextField T="string" Value="_scenario.StartUrl" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Label="Start url" Placeholder="https://localhost:5001/signup" Immediate="true"
+                          DebounceInterval="600" Style="width:100%"
+                          ValueChanged="@(v => { _scenario.StartUrl = v; Save(silent: true); })" />
+        </div>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Code" OnClick="ExportAsync">Export</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PlayArrow"
+                   Disabled="@(Runner.IsRunning || _scenario.EnabledStepCount == 0)" OnClick="@(() => RunAsync(0))">
+            Run
+        </MudButton>
+        <MudTooltip Text="@(Recorder.IsLive
+            ? "Run in the browser window that is already open, with a Stop button on the page"
+            : "Opens a browser window you can watch, with a Stop button on the page. It stays open afterwards.")">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Visibility"
+                       Disabled="@(Runner.IsRunning || Recorder.IsPlaying || _scenario.EnabledStepCount == 0)"
+                       OnClick="@(() => WatchAsync())">
+                @(Recorder.IsLive ? "Run here" : "Watch")
+            </MudButton>
+        </MudTooltip>
+        @if (Runner.IsRunning)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Stop"
+                       OnClick="@(() => Runner.Abort())">Stop</MudButton>
+        }
+    </div>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="8">
+            @* ------------------------------------------------------------ recorder bar *@
+            <MudPaper Outlined="true" Class="pa-3 mb-3 recorder-bar">
+                @if (!Recorder.IsLive)
+                {
+                    <div class="d-flex align-center gap-3 flex-wrap">
+                        @* Outlined rather than filled: red still reads as "record", but a solid
+                           red block here competes with Run for the eye on a screen where Run is
+                           the primary action. *@
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.FiberManualRecord"
+                                   Disabled="@(Runner.IsRunning || _starting)"
+                                   OnClick="StartRecordingAsync">
+                            @(_scenario.Steps.Count == 0 ? "Start recording" : "Record more steps")
+                        </MudButton>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                            Opens a real browser. Close that window when you are done - the steps save themselves.
+                        </MudText>
+                        @if (Recorder.Steps.Count > 0)
+                        {
+                            @* Only reachable if a save failed - the steps are still here, so offer a retry. *@
+                            <MudSpacer />
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Warning"
+                                       StartIcon="@Icons.Material.Filled.PlaylistAdd" OnClick="KeepRecording">
+                                Save @Recorder.Steps.Count unsaved step@(Recorder.Steps.Count == 1 ? "" : "s")
+                            </MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="DiscardRecording">Discard</MudButton>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-center gap-2 flex-wrap">
+                        <MudChip T="string" Color="@(Recorder.State == RecorderState.Paused ? Color.Warning : Color.Error)"
+                                 Variant="Variant.Filled" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.FiberManualRecord" Class="rec-chip">
+                            @(Recorder.State == RecorderState.Paused ? "PAUSED" : "REC")
+                        </MudChip>
+
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined"
+                                   StartIcon="@(Recorder.State == RecorderState.Paused ? Icons.Material.Filled.PlayArrow : Icons.Material.Filled.Pause)"
+                                   OnClick="TogglePauseAsync">
+                            @(Recorder.State == RecorderState.Paused ? "Resume" : "Pause")
+                        </MudButton>
+
+                        <MudMenu Label="Add check" StartIcon="@Icons.Material.Filled.CheckCircleOutline"
+                                 Variant="Variant.Outlined" Size="Size.Small" Dense="true">
+                            <MudMenuItem OnClick="@(() => PickAsync("AssertVisible"))">Element is visible</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => PickAsync("AssertHidden"))">Element is hidden</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => PickAsync("AssertText"))">Element text</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => PickAsync("AssertValue"))">Input value</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => PickAsync("AssertChecked"))">Checked state</MudMenuItem>
+                            <MudDivider />
+                            <MudMenuItem OnClick="@(() => PickAsync("WaitForSelector"))">Wait for element</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => PickAsync("Hover"))">Hover element</MudMenuItem>
+                        </MudMenu>
+
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.StopCircle" OnClick="StopRecordingAsync">
+                            Stop &amp; save
+                        </MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Default"
+                                   StartIcon="@Icons.Material.Filled.DeleteOutline" OnClick="DiscardRecordingAsync">
+                            Discard
+                        </MudButton>
+                        <MudSpacer />
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary text-truncate" Style="max-width:320px">
+                            @Recorder.CurrentUrl
+                        </MudText>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(Recorder.StatusMessage))
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary mt-2 d-block">@Recorder.StatusMessage</MudText>
+                }
+            </MudPaper>
+
+            @* ------------------------------------------------------------ steps *@
+            <MudPaper Outlined="true" Class="pa-0">
+                <div class="d-flex align-center pa-3 pb-2">
+                    <MudText Typo="Typo.subtitle1">Steps</MudText>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="ml-2">
+                        @_scenario.Steps.Count saved@(Recorder.Steps.Count > 0 ? $" + {Recorder.Steps.Count} new" : "")
+                    </MudChip>
+                    <MudSpacer />
+                    <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => AddStepAsync(null))">
+                        Add step
+                    </MudButton>
+                </div>
+                <MudDivider />
+
+                @if (_scenario.Steps.Count == 0 && Recorder.Steps.Count == 0)
+                {
+                    <div class="pa-8 text-center mud-text-secondary">
+                        <MudIcon Icon="@Icons.Material.Filled.TouchApp" Size="Size.Large" Class="mb-2" />
+                        <MudText Typo="Typo.body2">
+                            No steps yet. Start recording, or add one by hand.
+                        </MudText>
+                    </div>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Hover="true" Class="step-table">
+                        <tbody>
+                            @for (var i = 0; i < _scenario.Steps.Count; i++)
+                            {
+                                var index = i;
+                                var step = _scenario.Steps[index];
+                                var result = ResultFor(index);
+                                <tr class="@(result?.Status == StepStatus.Running ? "step-running" : null)">
+                                    <td style="width:36px" class="mud-text-secondary">
+                                        @if (result is not null)
+                                        {
+                                            <MudIcon Size="Size.Small" Icon="@StatusIcon(result.Status)"
+                                                     Color="@StatusColor(result.Status)" />
+                                        }
+                                        else
+                                        {
+                                            @(index + 1)
+                                        }
+                                    </td>
+                                    <td style="width:34px">
+                                        <MudCheckBox T="bool" Value="step.Enabled" Dense="true" Size="Size.Small"
+                                                     ValueChanged="@(v => ToggleEnabled(step, v))" />
+                                    </td>
+                                    <td style="width:118px">
+                                        <span class="step-action">@step.Action.Icon() @step.Action</span>
+                                    </td>
+                                    <td>
+                                        <div class="step-desc" title="@step.Summarise()">@step.Summarise()</div>
+                                        @if (!string.IsNullOrWhiteSpace(step.Selector))
+                                        {
+                                            <code class="selector" title="@step.Selector">@step.Selector</code>
+                                        }
+                                        @if (step.FrameChain.Count > 0)
+                                        {
+                                            <MudTooltip Text="@($"Inside iframe: {string.Join("  >>  ", step.FrameChain)}")">
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Warning">
+                                                    in @(step.FrameChain[^1])
+                                                </MudChip>
+                                            </MudTooltip>
+                                        }
+                                        @if (result?.Error is not null)
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Error" Class="d-block mt-1">@result.Error</MudText>
+                                        }
+                                        else if (result?.Note is not null)
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Warning" Class="d-block mt-1">@result.Note</MudText>
+                                        }
+                                    </td>
+                                    <td style="width:132px" class="mud-text-secondary">
+                                        @if (step.Action.NeedsValue() && !string.IsNullOrEmpty(step.Value))
+                                        {
+                                            <span class="value" title="@Mask(step)">@Mask(step)</span>
+                                        }
+                                    </td>
+                                    <td style="width:190px" class="text-right step-actions">
+                                        @if (Recorder.IsLive && !string.IsNullOrWhiteSpace(step.Selector))
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Filled.CenterFocusWeak" Size="Size.Small"
+                                                           title="Highlight in the live browser"
+                                                           OnClick="@(() => TestSelectorAsync(step))" />
+                                        }
+                                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small"
+                                                       title="Run from here" Disabled="Runner.IsRunning"
+                                                       OnClick="@(() => RunAsync(index))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                                       title="Edit step" OnClick="@(() => EditStepAsync(step))" />
+                                        <MudIconButton Size="Size.Small"
+                                                       Icon="@(string.IsNullOrWhiteSpace(step.Instruction)
+                                                           ? Icons.Material.Outlined.Notes : Icons.Material.Filled.Notes)"
+                                                       Color="@(string.IsNullOrWhiteSpace(step.Instruction) ? Color.Default : Color.Info)"
+                                                       title="Write the manual instruction for this step"
+                                                       OnClick="@(() => EditInstructionAsync(step))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                                                       Disabled="@(index == 0)" OnClick="@(() => Move(index, -1))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                       Disabled="@(index == _scenario.Steps.Count - 1)" OnClick="@(() => Move(index, 1))" />
+                                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
+                                                 AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Add" OnClick="@(() => AddStepAsync(index))">Insert below</MudMenuItem>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.ContentCopy" OnClick="@(() => DuplicateStep(index))">Duplicate</MudMenuItem>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeleteStep(index))">Delete</MudMenuItem>
+                                        </MudMenu>
+                                    </td>
+                                </tr>
+                            }
+
+                            @foreach (var step in Recorder.Steps)
+                            {
+                                var live = step;
+                                <tr class="step-live">
+                                    <td class="mud-text-secondary">
+                                        <MudIcon Size="Size.Small" Icon="@Icons.Material.Filled.FiberManualRecord" Color="Color.Error" />
+                                    </td>
+                                    <td></td>
+                                    <td><span class="step-action">@live.Action.Icon() @live.Action</span></td>
+                                    <td>
+                                        <div class="step-desc">@live.Summarise()</div>
+                                        @if (!string.IsNullOrWhiteSpace(live.Selector))
+                                        {
+                                            <code class="selector">@live.Selector</code>
+                                        }
+                                    </td>
+                                    <td class="mud-text-secondary text-truncate">
+                                        @if (!string.IsNullOrEmpty(live.Value))
+                                        {
+                                            <span class="value">@Mask(live)</span>
+                                        }
+                                    </td>
+                                    <td class="text-right">
+                                        <MudIconButton Size="Size.Small"
+                                                       Icon="@(string.IsNullOrWhiteSpace(live.Instruction)
+                                                           ? Icons.Material.Outlined.Notes : Icons.Material.Filled.Notes)"
+                                                       Color="@(string.IsNullOrWhiteSpace(live.Instruction) ? Color.Default : Color.Info)"
+                                                       title="Write the manual instruction while it is fresh"
+                                                       OnClick="@(() => EditInstructionAsync(live))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                       title="Drop this captured step"
+                                                       OnClick="@(() => Recorder.RemoveStep(live.Id))" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* ------------------------------------------------------------ right rail *@
+        <MudItem xs="12" md="4">
+            @if (Runner.Current is { } run && run.ScenarioId == _scenario.Id)
+            {
+                <MudPaper Outlined="true" Class="pa-3 mb-3">
+                    <div class="d-flex align-center">
+                        <MudText Typo="Typo.subtitle2">Last run</MudText>
+                        <MudSpacer />
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@RunColor(run.Status)">
+                            @run.Status.ToString().ToLowerInvariant()
+                        </MudChip>
+                    </div>
+                    @if (Runner.IsRunning)
+                    {
+                        <MudProgressLinear Color="Color.Info" Indeterminate="true" Class="my-2" />
+                    }
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        @run.Passed passed · @run.Failed failed · @run.Skipped skipped ·
+                        @($"{run.Duration.TotalSeconds:0.0}") s
+                    </MudText>
+                    @if (!string.IsNullOrWhiteSpace(run.Error))
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@run.Error</MudAlert>
+                    }
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Class="mt-2"
+                               EndIcon="@Icons.Material.Filled.OpenInNew" Href="@($"/runs/{run.Id}")">
+                        Full report
+                    </MudButton>
+                </MudPaper>
+            }
+
+            <MudPaper Outlined="true" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Notes</MudText>
+                <MudTextField T="string" Value="_scenario.Description" Variant="Variant.Outlined" Lines="3"
+                              Placeholder="What is this journey meant to prove?" Margin="Margin.Dense"
+                              Immediate="true" DebounceInterval="600"
+                              ValueChanged="@(v => { _scenario.Description = v; Save(silent: true); })" />
+            </MudPaper>
+
+            <MudPaper Outlined="true" Class="pa-3 mb-3">
+                <div class="d-flex align-center mb-1">
+                    <MudText Typo="Typo.subtitle2">Variables</MudText>
+                    <MudSpacer />
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="AddVariable" />
+                </div>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mb-2">
+                    Use <code>{{name}}</code> in any step value. Built-ins:
+                    <code>{{guid}}</code>, <code>{{now}}</code>, <code>{{random:6}}</code>, <code>{{randomemail}}</code>.
+                </MudText>
+                @if (_scenario.Variables.Count == 0)
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">None yet.</MudText>
+                }
+                @foreach (var v in _scenario.Variables.ToList())
+                {
+                    <div class="d-flex align-center gap-1 mb-1">
+                        <MudTextField @bind-Value="v.Name" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Placeholder="name" Style="max-width:120px" />
+                        <MudTextField @bind-Value="v.Value" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Placeholder="value"
+                                      InputType="@(v.IsSecret && !_revealSecrets ? InputType.Password : InputType.Text)" />
+                        @if (v.IsSecret)
+                        {
+                            <MudIconButton Size="Size.Small"
+                                           Icon="@(_revealSecrets ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                           OnClick="@(() => _revealSecrets = !_revealSecrets)" title="Show / hide secrets" />
+                        }
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                       OnClick="@(() => _scenario.Variables.Remove(v))" />
+                    </div>
+                }
+                @if (_scenario.Variables.Any(v => v.IsSecret))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Warning" Class="d-block mt-1">
+                        Secrets are stored in plain text in the scenario json. Blank them out before sharing the file.
+                    </MudText>
+                }
+                @{
+                    var missing = ValueResolver.MissingVariables(_scenario);
+                }
+                @if (missing.Count > 0)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                        Undefined: @string.Join(", ", missing)
+                    </MudAlert>
+                }
+            </MudPaper>
+
+            <MudPaper Outlined="true" Class="pa-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Run options</MudText>
+                <MudSwitch T="bool" Value="Settings.Current.Headless" Color="Color.Primary"
+                           ValueChanged="@(v => SetHeadless(v))" Label="Headless" />
+                <MudSlider T="int" Value="Settings.Current.SlowMoMs" Min="0" Max="2000" Step="50"
+                           ValueChanged="@(v => SetSlowMo(v))" Class="mt-2">
+                    Slow motion: @Settings.Current.SlowMoMs ms
+                </MudSlider>
+                <MudSwitch T="bool" Value="Settings.Current.ScreenshotEveryStep" Color="Color.Primary"
+                           ValueChanged="@(v => { Settings.Current.ScreenshotEveryStep = v; Settings.Save(); })"
+                           Label="Screenshot every step" />
+                <MudSwitch T="bool" Value="Settings.Current.RecordTrace" Color="Color.Primary"
+                           ValueChanged="@(v => { Settings.Current.RecordTrace = v; Settings.Save(); })"
+                           Label="Record trace.zip" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "record")] public string? AutoRecord { get; set; }
+
+    private Scenario? _scenario;
+    private bool _revealSecrets;
+    private bool _starting;
+    private bool _autoStarted;
+
+    protected override void OnInitialized()
+    {
+        Recorder.Changed += OnChanged;
+        Recorder.Committed += OnRecordingSaved;
+        Runner.Changed += OnChanged;
+    }
+
+    protected override void OnParametersSet() => _scenario = Store.Get(Id);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _autoStarted) return;
+        if (AutoRecord == "1" && _scenario is not null && !Recorder.IsLive)
+        {
+            _autoStarted = true;
+            await StartRecordingAsync();
+        }
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    /// <summary>
+    /// The recorder saved itself. Pull the new steps off disk without clobbering anything the
+    /// user typed into the name or notes while the browser was open.
+    /// </summary>
+    private void OnRecordingSaved(int count) => InvokeAsync(() =>
+    {
+        if (_scenario is null || Recorder.TargetScenarioId != _scenario.Id) return;
+
+        var saved = Store.Get(_scenario.Id);
+        if (saved is not null)
+        {
+            _scenario.Steps = saved.Steps;
+            _scenario.Variables = saved.Variables;
+            if (string.IsNullOrWhiteSpace(_scenario.StartUrl)) _scenario.StartUrl = saved.StartUrl;
+        }
+
+        Snackbar.Add($"{count} step{(count == 1 ? "" : "s")} saved - press Run to replay", Severity.Success);
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Recorder.Changed -= OnChanged;
+        Recorder.Committed -= OnRecordingSaved;
+        Runner.Changed -= OnChanged;
+    }
+
+    // ------------------------------------------------------------------ recording
+
+    private async Task StartRecordingAsync()
+    {
+        if (_scenario is null) return;
+        Save(silent: true);
+        _starting = true;
+        try
+        {
+            var url = _scenario.StartUrl;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                var result = await Dialogs.ShowAsync<UrlPromptDialog>("Where should recording start?",
+                    new DialogParameters<UrlPromptDialog> { { x => x.Url, "" } });
+                var outcome = await result.Result;
+                if (outcome is { Canceled: false, Data: string entered } && !string.IsNullOrWhiteSpace(entered))
+                {
+                    url = entered.Trim();
+                    _scenario.StartUrl = url;
+                    Save(silent: true);
+                }
+                else
+                {
+                    return;
+                }
+            }
+            await Recorder.StartAsync(url, _scenario.Id);
+        }
+        finally
+        {
+            _starting = false;
+        }
+    }
+
+    private async Task TogglePauseAsync() => await Recorder.SetPausedAsync(Recorder.State != RecorderState.Paused);
+
+    private async Task PickAsync(string action)
+    {
+        await Recorder.PickAsync(action);
+        Snackbar.Add("Switch to the browser window and click the element you want to check.", Severity.Info);
+    }
+
+    /// <summary>The recorder saves on its own; this just closes the browser for you.</summary>
+    private async Task StopRecordingAsync() => await Recorder.StopAsync();
+
+    /// <summary>Throw the take away: drop the captured steps first, then close the browser.</summary>
+    private async Task DiscardRecordingAsync()
+    {
+        var dropped = Recorder.Steps.Count;
+        Recorder.ClearSteps();
+        await Recorder.StopAsync();
+        Snackbar.Add(dropped == 0 ? "Recording stopped" : $"{dropped} captured step{(dropped == 1 ? "" : "s")} discarded",
+            Severity.Normal);
+    }
+
+    /// <summary>Retry a save that failed - the only way steps are still sitting in memory.</summary>
+    private void KeepRecording()
+    {
+        if (_scenario is null || Recorder.Steps.Count == 0) return;
+
+        _scenario.Steps.AddRange(Recorder.Steps.Select(s => s.Clone()));
+        foreach (var v in Recorder.CapturedVariables)
+        {
+            var existing = _scenario.Variables.FirstOrDefault(x => string.Equals(x.Name, v.Name, StringComparison.OrdinalIgnoreCase));
+            if (existing is null)
+                _scenario.Variables.Add(new ScenarioVariable { Name = v.Name, Value = v.Value, IsSecret = v.IsSecret, Note = v.Note });
+            else
+                existing.Value = v.Value;
+        }
+
+        if (string.IsNullOrWhiteSpace(_scenario.StartUrl))
+            _scenario.StartUrl = _scenario.Steps.FirstOrDefault(s => s.Action == StepAction.Navigate)?.Value ?? "";
+
+        var added = Recorder.Steps.Count;
+        Recorder.ClearSteps();
+        Save(silent: true);
+        Snackbar.Add($"{added} step{(added == 1 ? "" : "s")} saved", Severity.Success);
+    }
+
+    private void DiscardRecording()
+    {
+        Recorder.ClearSteps();
+        Snackbar.Add("Captured steps discarded", Severity.Normal);
+    }
+
+    /// <summary>
+    /// Runs in the window that is already open. If none is, opens one first and leaves it open,
+    /// so the next run reuses it rather than stacking up windows.
+    /// </summary>
+    private async Task WatchAsync()
+    {
+        if (_scenario is null) return;
+        Save(silent: true);
+
+        RunResult? run;
+
+        if (Settings.Current.AttachToMyBrowser)
+        {
+            // The run opens a tab in the browser you are already using, and leaves it there.
+            run = await Runner.RunAsync(_scenario, 0, headlessOverride: false);
+        }
+        else
+        {
+            if (!await EnsureSessionAsync()) return;
+            run = await Recorder.RunHereAsync(_scenario);
+            if (run is null)
+            {
+                Snackbar.Add("The window is busy - wait for the current run to finish.", Severity.Warning);
+                return;
+            }
+        }
+
+        Snackbar.Add(run.Status == RunStatus.Passed
+            ? $"Run passed - {run.Passed} steps in {run.Duration.TotalSeconds:0.0}s. The window is yours again."
+            : $"Run {run.Status.ToString().ToLowerInvariant()} - {run.Error}",
+            run.Status == RunStatus.Passed ? Severity.Success : Severity.Error);
+    }
+
+    /// <summary>
+    /// Anything that acts on "the open window" needs one. Opens it on demand rather than hiding
+    /// the buttons until a session happens to exist.
+    /// </summary>
+    private async Task<bool> EnsureSessionAsync()
+    {
+        if (Recorder.IsLive) return true;
+        await StartRecordingAsync();
+        if (!Recorder.IsLive) return false;         // no start url, or it could not open
+        await Task.Delay(500);                      // let the first page settle
+        return true;
+    }
+
+    private async Task TestSelectorAsync(TestStep step)
+    {
+        var message = await Recorder.TrySelectorAsync(step.Selector ?? "", step.FrameChain);
+        Snackbar.Add(message, message.StartsWith("1 match") ? Severity.Success : Severity.Info);
+    }
+
+    // ------------------------------------------------------------------ steps
+
+    private void ToggleEnabled(TestStep step, bool value)
+    {
+        step.Enabled = value;
+        Save(silent: true);
+    }
+
+    private async Task AddStepAsync(int? afterIndex)
+    {
+        if (_scenario is null) return;
+        var step = new TestStep { Action = StepAction.Click };
+        var result = await Dialogs.ShowAsync<StepDialog>("Add step",
+            new DialogParameters<StepDialog> { { x => x.Step, step }, { x => x.Recorder, Recorder } });
+        var outcome = await result.Result;
+        if (outcome is { Canceled: true }) return;
+
+        if (afterIndex is int i) _scenario.Steps.Insert(i + 1, step);
+        else _scenario.Steps.Add(step);
+        Save(silent: true);
+    }
+
+    private async Task EditStepAsync(TestStep step)
+    {
+        var copy = step.Clone();
+        copy.Id = step.Id;
+        var result = await Dialogs.ShowAsync<StepDialog>("Edit step",
+            new DialogParameters<StepDialog> { { x => x.Step, copy }, { x => x.Recorder, Recorder } });
+        var outcome = await result.Result;
+        if (outcome is { Canceled: true } || _scenario is null) return;
+
+        var index = _scenario.Steps.FindIndex(s => s.Id == step.Id);
+        if (index >= 0) _scenario.Steps[index] = copy;
+        Save(silent: true);
+    }
+
+    /// <summary>
+    /// The words that go in the manual for this step. Editable while recording too, which is
+    /// when you actually remember what the step was for.
+    /// </summary>
+    private async Task EditInstructionAsync(TestStep step)
+    {
+        var result = await Dialogs.ShowAsync<InstructionDialog>("Manual instruction",
+            new DialogParameters<InstructionDialog> { { x => x.Step, step } },
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        if ((await result.Result) is { Canceled: true }) return;
+
+        // Live steps live in the recorder until it commits; saved ones belong to the scenario.
+        if (_scenario is not null && _scenario.Steps.Any(x => x.Id == step.Id)) Save(silent: true);
+        StateHasChanged();
+    }
+
+    private void DuplicateStep(int index)
+    {
+        if (_scenario is null) return;
+        _scenario.Steps.Insert(index + 1, _scenario.Steps[index].Clone());
+        Save(silent: true);
+    }
+
+    private void DeleteStep(int index)
+    {
+        if (_scenario is null) return;
+        _scenario.Steps.RemoveAt(index);
+        Save(silent: true);
+    }
+
+    private void Move(int index, int delta)
+    {
+        if (_scenario is null) return;
+        var target = index + delta;
+        if (target < 0 || target >= _scenario.Steps.Count) return;
+        (_scenario.Steps[index], _scenario.Steps[target]) = (_scenario.Steps[target], _scenario.Steps[index]);
+        Save(silent: true);
+    }
+
+    private void AddVariable() => _scenario?.Variables.Add(new ScenarioVariable { Name = "", Value = "" });
+
+    // ------------------------------------------------------------------ run / save / export
+
+    private void Save() => Save(silent: false);
+
+    private void Save(bool silent)
+    {
+        if (_scenario is null) return;
+        Store.Save(_scenario);
+        if (!silent) Snackbar.Add("Saved", Severity.Success);
+    }
+
+    /// <summary>watch forces a visible browser regardless of the headless setting.</summary>
+    private async Task RunAsync(int startIndex, bool watch = false)
+    {
+        if (_scenario is null) return;
+        Save(silent: true);
+        await Runner.RunAsync(_scenario, startIndex, watch ? false : null);
+        var run = Runner.Current;
+        if (run is not null)
+        {
+            Snackbar.Add(run.Status == RunStatus.Passed
+                ? $"Run passed - {run.Passed} steps in {run.Duration.TotalSeconds:0.0}s"
+                : $"Run {run.Status.ToString().ToLowerInvariant()} - {run.Error}",
+                run.Status == RunStatus.Passed ? Severity.Success : Severity.Error);
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (_scenario is null) return;
+        Save(silent: true);
+        await Dialogs.ShowAsync<ExportDialog>("Export " + _scenario.Name,
+            new DialogParameters<ExportDialog> { { x => x.Scenario, _scenario } },
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+    }
+
+    private void SetHeadless(bool value)
+    {
+        Settings.Current.Headless = value;
+        Settings.Save();
+    }
+
+    private void SetSlowMo(int value)
+    {
+        Settings.Current.SlowMoMs = value;
+        Settings.Save();
+    }
+
+    // ------------------------------------------------------------------ view helpers
+
+    private StepResult? ResultFor(int index)
+    {
+        var run = Runner.Current;
+        if (run is null || _scenario is null || run.ScenarioId != _scenario.Id) return null;
+        if (index >= run.Steps.Count) return null;
+        var result = run.Steps[index];
+        return result.StepId == _scenario.Steps[index].Id ? result : null;
+    }
+
+    private string Mask(TestStep step)
+    {
+        var value = step.Value ?? "";
+        if (_scenario is not null && value.StartsWith("{{") && value.EndsWith("}}"))
+        {
+            var name = value[2..^2].Trim();
+            if (_scenario.Variables.Any(v => v.IsSecret && string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase)) && !_revealSecrets)
+                return value;
+        }
+        return value.Length > 42 ? value[..42] + "…" : value;
+    }
+
+    private static string StatusIcon(StepStatus status) => status switch
+    {
+        StepStatus.Passed => Icons.Material.Filled.CheckCircle,
+        StepStatus.Failed => Icons.Material.Filled.Cancel,
+        StepStatus.Running => Icons.Material.Filled.HourglassTop,
+        StepStatus.Skipped => Icons.Material.Filled.RemoveCircleOutline,
+        _ => Icons.Material.Filled.RadioButtonUnchecked
+    };
+
+    private static Color StatusColor(StepStatus status) => status switch
+    {
+        StepStatus.Passed => Color.Success,
+        StepStatus.Failed => Color.Error,
+        StepStatus.Running => Color.Info,
+        _ => Color.Default
+    };
+
+    private static Color RunColor(RunStatus status) => status switch
+    {
+        RunStatus.Passed => Color.Success,
+        RunStatus.Failed => Color.Error,
+        RunStatus.Running => Color.Info,
+        _ => Color.Default
+    };
+}

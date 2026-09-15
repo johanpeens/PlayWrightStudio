@@ -1,0 +1,101 @@
+﻿@inject IDialogService Dialogs
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+            Every distinct page <b>@ScenarioName</b> visits will be saved here as a full-page
+            screenshot plus its html, with a <code>pages.md</code> listing what came from where.
+        </MudText>
+
+        <div class="d-flex align-end gap-1">
+            <MudTextField @bind-Value="Folder" Label="Folder" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Immediate="true" Class="mono" Style="width:100%" AutoFocus="true"
+                          HelperText="Created if it does not exist yet." />
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.FolderOpen"
+                       OnClick="BrowseAsync" Class="mb-5">Browse</MudButton>
+        </div>
+
+        <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-3 mb-1">Quick picks</MudText>
+        <div class="d-flex flex-wrap gap-1">
+            @foreach (var pick in Picks)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                         OnClick="@(() => Folder = pick.Path)">@pick.Label</MudChip>
+            }
+        </div>
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+        else if (UnderBin)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">
+                That is inside the build output, so rebuilding the app will delete these captures.
+                Fine for a quick look; pick somewhere else to keep them.
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.PhotoCamera"
+                   Disabled="@string.IsNullOrWhiteSpace(Folder)" OnClick="Confirm">
+            Start capturing
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string ScenarioName { get; set; } = "";
+    [Parameter] public string Folder { get; set; } = "";
+    [Parameter] public List<(string Label, string Path)> Picks { get; set; } = new();
+
+    private string? _error;
+
+    private bool UnderBin =>
+        !string.IsNullOrWhiteSpace(Folder) &&
+        Folder.Replace('/', '\\').Contains("\\bin\\", StringComparison.OrdinalIgnoreCase);
+
+    private async Task BrowseAsync()
+    {
+        var picker = await Dialogs.ShowAsync<FolderPickerDialog>("Choose a folder",
+            new DialogParameters<FolderPickerDialog> { { x => x.StartAt, Folder } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if ((await picker.Result) is { Canceled: false, Data: string chosen })
+        {
+            Folder = chosen;
+            _error = null;
+        }
+    }
+
+    private void Confirm()
+    {
+        _error = null;
+        var folder = Folder.Trim().Trim('"');
+
+        try
+        {
+            if (!Path.IsPathFullyQualified(folder))
+            {
+                _error = "Give a full path, for example C:\\Development\\captures.";
+                return;
+            }
+
+            // Prove it is writable now rather than failing halfway through a run.
+            Directory.CreateDirectory(folder);
+            var probe = Path.Combine(folder, ".pws-write-test");
+            File.WriteAllText(probe, "");
+            File.Delete(probe);
+        }
+        catch (Exception ex)
+        {
+            _error = "Cannot write there: " + ex.Message;
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(folder));
+    }
+}

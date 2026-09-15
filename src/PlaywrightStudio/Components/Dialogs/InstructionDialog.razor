@@ -1,0 +1,61 @@
+﻿@using Markdig
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
+            What should the reader of the manual be told to do here? The step itself is
+            <b>@Step.Summarise()</b>.
+        </MudText>
+
+        <MudGrid Spacing="2">
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="Step.Instruction" Label="Instruction" Variant="Variant.Outlined"
+                              Lines="9" Immediate="true" AutoFocus="true" Style="width:100%"
+                              HelperText="Markdown: **bold**, *italic*, `code`, - lists" />
+                <div class="d-flex flex-wrap gap-1 mt-2">
+                    @foreach (var snippet in Snippets)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 OnClick="@(() => Insert(snippet.Text))">@snippet.Label</MudChip>
+                    }
+                </div>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Preview</MudText>
+                <MudPaper Outlined="true" Class="pa-3 mt-1 manual-preview" Style="min-height:232px">
+                    @((MarkupString)Preview)
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudSwitch T="bool" @bind-Value="Step.HideFromManual" Color="Color.Warning" Class="mt-2"
+                   Label="Leave this step out of the manual" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="@(() => MudDialog.Close(DialogResult.Ok(Step)))">Done</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public TestStep Step { get; set; } = new();
+
+    private static readonly MarkdownPipeline Pipeline =
+        new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
+
+    private static readonly (string Label, string Text)[] Snippets =
+    {
+        ("Bold", "**text**"),
+        ("Code", "`value`"),
+        ("Bullet", "\n- "),
+        ("Note", "\n> Note: "),
+    };
+
+    private string Preview => string.IsNullOrWhiteSpace(Step.Instruction)
+        ? "<p style=\"color:#8a94a3\">Nothing written yet - the manual will fall back to a plain description of the step.</p>"
+        : Markdig.Markdown.ToHtml(Step.Instruction!, Pipeline);
+
+    private void Insert(string text) => Step.Instruction = (Step.Instruction ?? "") + text;
+}

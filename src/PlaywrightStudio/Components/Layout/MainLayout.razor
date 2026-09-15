@@ -1,0 +1,64 @@
+﻿@inherits LayoutComponentBase
+@inject RecorderService Recorder
+@inject RunnerService Runner
+@implements IDisposable
+
+<MudThemeProvider Theme="StudioTheme.Dark" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider MaxWidth="MaxWidth.Medium" FullWidth="true" CloseButton="true" BackdropClick="false" />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Color="Color.Transparent" Class="studio-appbar">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="@(() => _drawerOpen = !_drawerOpen)" />
+        <img src="PlaywrightStudioLogo.svg" alt="" class="studio-logo mr-2 ml-1" />
+        <MudText Typo="Typo.h6" Class="mr-1">Playwright Studio</MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">record &amp; replay form journeys</MudText>
+        <MudSpacer />
+        @if (Recorder.IsLive)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled"
+                     Icon="@Icons.Material.Filled.FiberManualRecord" Class="mr-2">
+                @(Recorder.State == RecorderState.Paused ? "PAUSED" : "RECORDING")
+            </MudChip>
+        }
+        @if (Runner.IsRunning)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled"
+                     Icon="@Icons.Material.Filled.PlayArrow" Class="mr-2">RUNNING</MudChip>
+        }
+        <MudTooltip Text="How this works">
+            <MudIconButton Icon="@Icons.Material.Filled.HelpOutline" Color="Color.Inherit" Href="/help" />
+        </MudTooltip>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0" Variant="DrawerVariant.Mini" OpenMiniOnHover="true"
+               Class="studio-drawer">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="studio-main">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+
+    protected override void OnInitialized()
+    {
+        Recorder.Changed += OnChanged;
+        Runner.Changed += OnChanged;
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Recorder.Changed -= OnChanged;
+        Runner.Changed -= OnChanged;
+    }
+}

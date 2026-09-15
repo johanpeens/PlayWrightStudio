@@ -1,0 +1,143 @@
+﻿@inject FileSystemBrowser Browser
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex align-center gap-1 mb-2">
+            <MudTooltip Text="Up one level">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                               Disabled="@(Browser.Parent(_current) is null)" OnClick="GoUp" />
+            </MudTooltip>
+            <MudTextField @bind-Value="_current" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Class="mono" Style="width:100%" Immediate="true"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.SubdirectoryArrowRight"
+                          OnAdornmentClick="GoToTyped" OnKeyUp="OnKey" />
+        </div>
+
+        <div class="d-flex flex-wrap gap-1 mb-2">
+            @foreach (var shortcut in _shortcuts)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                         Icon="@(shortcut.IsDrive ? Icons.Material.Filled.Storage : Icons.Material.Filled.FolderSpecial)"
+                         OnClick="@(() => Go(shortcut.Path))">@shortcut.Name</MudChip>
+            }
+        </div>
+
+        <MudPaper Outlined="true" Style="height:300px;overflow-y:auto">
+            @if (_folders.Count == 0)
+            {
+                <div class="pa-6 text-center mud-text-secondary">
+                    <MudIcon Icon="@Icons.Material.Filled.FolderOff" Class="mb-1" />
+                    <MudText Typo="Typo.body2">
+                        @(Browser.Exists(_current)
+                            ? "No sub-folders here. You can still choose this one."
+                            : "That folder does not exist.")
+                    </MudText>
+                </div>
+            }
+            else
+            {
+                <MudList T="string" Dense="true">
+                    @foreach (var folder in _folders)
+                    {
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.Folder"
+                                     OnClick="@(() => Go(folder.Path))">@folder.Name</MudListItem>
+                    }
+                </MudList>
+            }
+        </MudPaper>
+
+        <div class="d-flex align-center gap-1 mt-2">
+            @if (_creating)
+            {
+                <MudTextField @bind-Value="_newName" Placeholder="New folder name" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Immediate="true" AutoFocus="true" Style="max-width:260px" />
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateFolder">Create</MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => { _creating = false; _error = null; })">Cancel</MudButton>
+            }
+            else
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.CreateNewFolder"
+                           Disabled="@(!Browser.Exists(_current))" OnClick="@(() => _creating = true)">
+                    New folder
+                </MudButton>
+            }
+        </div>
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Check"
+                   OnClick="@(() => MudDialog.Close(DialogResult.Ok(_current)))">
+            Use this folder
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Where to open. Falls back to the nearest ancestor that exists.</summary>
+    [Parameter] public string StartAt { get; set; } = "";
+
+    private string _current = "";
+    private List<FileSystemBrowser.Entry> _folders = new();
+    private List<FileSystemBrowser.Entry> _shortcuts = new();
+    private bool _creating;
+    private string _newName = "";
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        _shortcuts = Browser.Shortcuts().ToList();
+        _current = NearestExisting(StartAt);
+        Load();
+    }
+
+    /// <summary>A suggested path may not exist yet; walk up until something does.</summary>
+    private string NearestExisting(string path)
+    {
+        var candidate = path;
+        for (var i = 0; i < 12 && !string.IsNullOrWhiteSpace(candidate); i++)
+        {
+            if (Browser.Exists(candidate)) return candidate;
+            candidate = Browser.Parent(candidate) ?? "";
+        }
+        return _shortcuts.FirstOrDefault()?.Path ?? "C:\\";
+    }
+
+    private void Load() => _folders = Browser.Children(_current).ToList();
+
+    private void Go(string path)
+    {
+        _current = path;
+        _creating = false;
+        _error = null;
+        Load();
+    }
+
+    private void GoUp()
+    {
+        if (Browser.Parent(_current) is { } parent) Go(parent);
+    }
+
+    private void GoToTyped() => Go(_current);
+
+    private void OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") GoToTyped();
+    }
+
+    private void CreateFolder()
+    {
+        var (ok, error, path) = Browser.CreateFolder(_current, _newName);
+        _error = error;
+        if (!ok) return;
+        _newName = "";
+        _creating = false;
+        Go(path);
+    }
+}

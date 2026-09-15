@@ -1,0 +1,180 @@
+﻿@page "/runs/{Id}"
+@inject RunStore Store
+@inject StudioPaths Paths
+@inject ScenarioStore Scenarios
+@inject ManualService Manuals
+@inject ManualStore ManualStore
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Run @Id - Playwright Studio</PageTitle>
+
+@if (_run is null)
+{
+    <MudAlert Severity="Severity.Error">That run is gone. <MudLink Href="/runs">Back to runs</MudLink></MudAlert>
+}
+else
+{
+    <div class="d-flex align-center gap-2 mb-3 flex-wrap">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/runs" />
+        <div>
+            <MudText Typo="Typo.h6">@_run.ScenarioName</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                @_run.StartedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss") ·
+                @_run.Browser@(_run.Headless ? " (headless)" : "") ·
+                @($"{_run.Duration.TotalSeconds:0.0}") s
+            </MudText>
+        </div>
+        <MudSpacer />
+        <MudChip T="string" Variant="Variant.Filled" Color="@Colour(_run.Status)">
+            @_run.Status.ToString().ToLowerInvariant()
+        </MudChip>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Replay"
+                   Href="@($"/scenario/{_run.ScenarioId}")">Open scenario</MudButton>
+        <MudTooltip Text="Draft a manual from this run - a step per screenshot, which you then edit and download as a pdf">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_building"
+                       StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="BuildManualAsync">
+                @(_building ? "Drafting…" : "User manual")
+            </MudButton>
+        </MudTooltip>
+        @if (_run.TraceFile is not null)
+        {
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                       Href="@($"/download/run/{_run.Id}/{_run.TraceFile}")">trace.zip</MudButton>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_run.Error))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-3">@_run.Error</MudAlert>
+    }
+
+    @if (_run.VideoFile is not null)
+    {
+        <MudPaper Outlined="true" Class="pa-3 mb-3">
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Recording</MudText>
+            <video src="@($"/videos/{_run.VideoFile}")" controls preload="metadata"
+                   style="max-width:100%;border-radius:8px"></video>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-2 mono">
+                @System.IO.Path.Combine(Paths.Videos, _run.VideoFile)
+            </MudText>
+        </MudPaper>
+    }
+
+    <MudPaper Outlined="true">
+        <MudSimpleTable Dense="true" Hover="true">
+            <tbody>
+                @foreach (var step in _run.Steps)
+                {
+                    var s = step;
+                    <tr>
+                        <td style="width:40px">
+                            <MudIcon Size="Size.Small" Icon="@Icon(s.Status)" Color="@StepColour(s.Status)" />
+                        </td>
+                        <td style="width:40px" class="mud-text-secondary">@(s.Index + 1)</td>
+                        <td style="width:140px"><span class="step-action">@s.Action.Icon() @s.Action</span></td>
+                        <td>
+                            <div class="step-desc">@s.Title</div>
+                            @if (!string.IsNullOrWhiteSpace(s.Selector))
+                            {
+                                <code class="selector">@s.Selector</code>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(s.Error))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Error" Class="d-block mt-1">@s.Error</MudText>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(s.Note))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Warning" Class="d-block mt-1">@s.Note</MudText>
+                            }
+                        </td>
+                        <td style="width:80px" class="mud-text-secondary">
+                            @(s.DurationMs > 0 ? $"{s.DurationMs} ms" : "")
+                        </td>
+                        <td style="width:150px">
+                            @if (s.ScreenshotFile is not null)
+                            {
+                                <a href="@($"/runmedia/{_run.Id}/{s.ScreenshotFile}")" target="_blank">
+                                    <img src="@($"/runmedia/{_run.Id}/{s.ScreenshotFile}")" class="shot-thumb" alt="screenshot" />
+                                </a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+
+    @if (_run.Log.Count > 0)
+    {
+        <MudPaper Outlined="true" Class="pa-3 mt-3">
+            <MudText Typo="Typo.subtitle2" Class="mb-1">Log</MudText>
+            @foreach (var line in _run.Log)
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">@line</MudText>
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private RunResult? _run;
+    private bool _building;
+
+    /// <summary>Renders the manual as a pdf and hands it straight to the browser.</summary>
+    private async Task BuildManualAsync()
+    {
+        if (_run is null) return;
+        var scenario = Scenarios.Get(_run.ScenarioId);
+        if (scenario is null)
+        {
+            Snackbar.Add("That scenario has been deleted, so there is nothing to write up.", Severity.Warning);
+            return;
+        }
+
+        _building = true;
+        try
+        {
+            // A draft you then edit, rather than a pdf straight to disk.
+            var manual = Manuals.CreateFromRun(scenario, _run);
+            Snackbar.Add($"Draft manual created with {manual.Steps.Count} step(s) - edit it, then download.",
+                Severity.Success);
+            Nav.NavigateTo($"/manuals/{manual.Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Could not build the manual: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _building = false;
+        }
+    }
+
+    protected override void OnParametersSet() => _run = Store.Get(Id);
+
+    private static Color Colour(RunStatus status) => status switch
+    {
+        RunStatus.Passed => Color.Success,
+        RunStatus.Failed => Color.Error,
+        RunStatus.Aborted => Color.Warning,
+        _ => Color.Default
+    };
+
+    private static Color StepColour(StepStatus status) => status switch
+    {
+        StepStatus.Passed => Color.Success,
+        StepStatus.Failed => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string Icon(StepStatus status) => status switch
+    {
+        StepStatus.Passed => Icons.Material.Filled.CheckCircle,
+        StepStatus.Failed => Icons.Material.Filled.Cancel,
+        StepStatus.Skipped => Icons.Material.Filled.RemoveCircleOutline,
+        _ => Icons.Material.Filled.RadioButtonUnchecked
+    };
+}

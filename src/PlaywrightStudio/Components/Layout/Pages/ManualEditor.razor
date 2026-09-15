@@ -1,0 +1,238 @@
+﻿@page "/manuals/{Id}"
+@using Markdig
+@inject ManualStore Store
+@inject ManualService Manuals
+@inject NavigationManager Nav
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_manual?.Title ?? "Manual") - Playwright Studio</PageTitle>
+
+@if (_manual is null)
+{
+    <MudAlert Severity="Severity.Error">That manual is gone. <MudLink Href="/manuals">Back to manuals</MudLink></MudAlert>
+}
+else
+{
+    <div class="d-flex align-center gap-2 mb-3 flex-wrap">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/manuals" title="Back to manuals" />
+        <div style="flex:1 1 320px;min-width:240px;max-width:560px">
+            <MudTextField @bind-Value="_manual.Title" Label="Title" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Immediate="true" Style="width:100%" />
+        </div>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Save" OnClick="Save">Save</MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Visibility"
+                   OnClick="@(() => _preview = !_preview)">
+            @(_preview ? "Edit" : "Preview")
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_building"
+                   StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="DownloadAsync">
+            @(_building ? "Building…" : "Download PDF")
+        </MudButton>
+    </div>
+
+    @if (_preview)
+    {
+        <MudPaper Outlined="true" Class="pa-0" Style="overflow:hidden">
+            <iframe srcdoc="@Manuals.BuildHtml(_manual)" style="width:100%;height:78vh;border:0;background:#fff"></iframe>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Outlined="true" Class="pa-3 mb-3">
+            <MudTextField @bind-Value="_manual.Intro" Label="Introduction (markdown)" Variant="Variant.Outlined"
+                          Lines="3" Margin="Margin.Dense" Immediate="true"
+                          HelperText="Shown under the title on the first page." />
+        </MudPaper>
+
+        @for (var i = 0; i < _manual.Steps.Count; i++)
+        {
+            var index = i;
+            var step = _manual.Steps[index];
+            var number = _manual.Steps.Take(index).Count(s => s.Include) + 1;
+
+            <MudPaper Outlined="true" Class="@(step.Include ? "pa-3 mb-3" : "pa-3 mb-3 manual-step-off")">
+                <div class="d-flex align-center gap-2 mb-2">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                             Color="@(step.Include ? Color.Dark : Color.Default)">
+                        @(step.Include ? number.ToString() : "—")
+                    </MudChip>
+                    <MudSwitch T="bool" Value="step.Include" Color="Color.Primary"
+                               ValueChanged="@(v => { step.Include = v; Save(silent: true); })"
+                               Label="In the manual" />
+                    <MudSpacer />
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                                   Disabled="@(index == 0)" OnClick="@(() => Move(index, -1))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                   Disabled="@(index == _manual.Steps.Count - 1)" OnClick="@(() => Move(index, 1))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                   title="Add a step below" OnClick="@(() => AddBelow(index))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                   title="Remove this step" OnClick="@(() => Remove(index))" />
+                </div>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="step.Text" Label="Instruction" Variant="Variant.Outlined"
+                                      Lines="7" Margin="Margin.Dense" Immediate="true" Style="width:100%"
+                                      HelperText="Markdown: **bold**, `code`, - lists, > note, [text](url)" />
+                        <MudPaper Outlined="true" Class="pa-2 mt-2 manual-preview">
+                            @((MarkupString)Render(step.Text))
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        @if (!string.IsNullOrWhiteSpace(step.ImageFile))
+                        {
+                            <a href="@ImageUrl(step)" target="_blank">
+                                <img src="@ImageUrl(step)" alt="Step @number" class="manual-shot" />
+                            </a>
+                        }
+                        else
+                        {
+                            <MudPaper Outlined="true" Class="pa-6 d-flex flex-column align-center mud-text-secondary">
+                                <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Class="mb-1" />
+                                <MudText Typo="Typo.body2">No picture for this step</MudText>
+                            </MudPaper>
+                        }
+
+                        <div class="d-flex align-center gap-2 mt-2 flex-wrap">
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined"
+                                       StartIcon="@Icons.Material.Filled.Upload"
+                                       OnClick="@(() => _uploadFor = step.Id)">
+                                @(string.IsNullOrWhiteSpace(step.ImageFile) ? "Add picture" : "Replace picture")
+                            </MudButton>
+                            @if (!string.IsNullOrWhiteSpace(step.ImageFile))
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text"
+                                           OnClick="@(() => ClearImage(step))">Remove picture</MudButton>
+                            }
+                        </div>
+
+                        @if (_uploadFor == step.Id)
+                        {
+                            <div class="mt-2">
+                                <InputFile OnChange="@(e => UploadAsync(step, e))" accept="image/*" />
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-1">
+                                    A png or jpg. It is copied into this manual, so the original can move or go.
+                                </MudText>
+                            </div>
+                        }
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => AddBelow(_manual.Steps.Count - 1))">
+            Add a step
+        </MudButton>
+    }
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private static readonly MarkdownPipeline Pipeline =
+        new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
+
+    private Manual? _manual;
+    private bool _preview;
+    private bool _building;
+    private string? _uploadFor;
+
+    protected override void OnParametersSet() => _manual = Store.Get(Id);
+
+    private string ImageUrl(ManualStep step) => $"/manualmedia/{Id}/{step.ImageFile}?v={step.Id}";
+
+    private static string Render(string? markdown) =>
+        string.IsNullOrWhiteSpace(markdown)
+            ? "<span style=\"color:#8a94a3\">Nothing written yet.</span>"
+            : Markdig.Markdown.ToHtml(markdown, Pipeline);
+
+    private void Save() => Save(silent: false);
+
+    private void Save(bool silent)
+    {
+        if (_manual is null) return;
+        Store.Save(_manual);
+        if (!silent) Snackbar.Add("Saved", Severity.Success);
+    }
+
+    private void Move(int index, int delta)
+    {
+        if (_manual is null) return;
+        var target = index + delta;
+        if (target < 0 || target >= _manual.Steps.Count) return;
+        (_manual.Steps[index], _manual.Steps[target]) = (_manual.Steps[target], _manual.Steps[index]);
+        Save(silent: true);
+    }
+
+    private void AddBelow(int index)
+    {
+        if (_manual is null) return;
+        var at = Math.Clamp(index + 1, 0, _manual.Steps.Count);
+        _manual.Steps.Insert(at, new ManualStep { Text = "" });
+        Save(silent: true);
+    }
+
+    private void Remove(int index)
+    {
+        if (_manual is null) return;
+        Store.ForgetImage(_manual.Id, _manual.Steps[index].ImageFile);
+        _manual.Steps.RemoveAt(index);
+        Save(silent: true);
+    }
+
+    private void ClearImage(ManualStep step)
+    {
+        if (_manual is null) return;
+        Store.ForgetImage(_manual.Id, step.ImageFile);
+        step.ImageFile = null;
+        Save(silent: true);
+    }
+
+    /// <summary>Swap in your own picture - a cropped shot, an annotated one, anything.</summary>
+    private async Task UploadAsync(ManualStep step, InputFileChangeEventArgs e)
+    {
+        if (_manual is null || e.File is null) return;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+            var previous = step.ImageFile;
+            step.ImageFile = await Store.AddImageAsync(_manual.Id, stream, e.File.Name);
+
+            // Only once the new one is safely written - otherwise a failure loses both.
+            Store.ForgetImage(_manual.Id, previous);
+
+            _uploadFor = null;
+            Save(silent: true);
+            Snackbar.Add("Picture replaced", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Could not read that file: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (_manual is null) return;
+        Save(silent: true);
+        _building = true;
+        try
+        {
+            var path = await Manuals.BuildPdfAsync(_manual);
+            Nav.NavigateTo($"/download/manual/{_manual.Id}/{System.IO.Path.GetFileName(path)}", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Could not build the pdf: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _building = false;
+        }
+    }
+}

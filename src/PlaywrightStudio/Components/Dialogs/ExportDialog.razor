@@ -1,0 +1,63 @@
+﻿@inject CodeExporter Exporter
+@inject ScenarioStore Store
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" @bind-ActivePanelIndex="_tab">
+            <MudTabPanel Text="C# / NUnit" />
+            <MudTabPanel Text="TypeScript" />
+            <MudTabPanel Text="Python" />
+            <MudTabPanel Text="Scenario json" />
+        </MudTabs>
+
+        <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-2 mb-1">@Hint</MudText>
+
+        <pre class="code-block">@Code</pre>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Close</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.ContentCopy" OnClick="CopyAsync">Copy</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Download"
+                   OnClick="DownloadAsync">
+            Download @FileName
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Scenario Scenario { get; set; } = new();
+
+    private int _tab;
+
+    private ExportFormat Format => _tab switch
+    {
+        1 => ExportFormat.TypeScript,
+        2 => ExportFormat.PythonPytest,
+        _ => ExportFormat.NUnitCSharp
+    };
+
+    private string Code => _tab == 3 ? Store.Export(Scenario) : Exporter.Export(Scenario, Format);
+
+    private string FileName => _tab == 3
+        ? CodeExporter.Slug(Scenario.Name) + ".json"
+        : CodeExporter.FileName(Scenario, Format);
+
+    private string Hint => _tab switch
+    {
+        0 => "Drop this into a test project referencing Microsoft.Playwright.NUnit.",
+        1 => "Drop this into a @playwright/test project as a .spec.ts file.",
+        2 => "Needs pytest-playwright: pip install pytest-playwright.",
+        _ => "The studio's own format - import it on another machine to get the scenario back."
+    };
+
+    private async Task CopyAsync()
+    {
+        await JS.InvokeVoidAsync("studio.copy", Code);
+        Snackbar.Add("Copied to clipboard", Severity.Success);
+    }
+
+    private async Task DownloadAsync() => await JS.InvokeVoidAsync("studio.download", FileName, Code);
+}

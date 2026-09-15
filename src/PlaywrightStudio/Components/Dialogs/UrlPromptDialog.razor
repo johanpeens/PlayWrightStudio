@@ -1,0 +1,17 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="Url" Label="Start url" Variant="Variant.Outlined" AutoFocus="true"
+                      Placeholder="https://localhost:5001/signup" Immediate="true"
+                      HelperText="The recorder opens a browser here before it starts capturing." />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@string.IsNullOrWhiteSpace(Url)"
+                   OnClick="@(() => MudDialog.Close(DialogResult.Ok(Url)))">Start recording</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Url { get; set; } = "";
+}

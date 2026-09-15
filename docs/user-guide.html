@@ -1,0 +1,1418 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playwright Studio Guide</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+  /* ---------------------------------------------------------------- tokens */
+  :root {
+    --ground:      #f6f7fb;
+    --surface:     #ffffff;
+    --surface-2:   #eef1f7;
+    --ink:         #151a21;
+    --ink-soft:    #5c6675;
+    --ink-faint:   #8892a1;
+    --rule:        #e3e7f0;
+    --rule-strong: #cfd6e4;
+    --blue:        #2f6fd0;
+    --blue-wash:   #e8f0fd;
+    --rec:         #d02c48;
+    --rec-wash:    #fdecef;
+    --mint:        #0d8a68;
+    --mint-wash:   #e4f6ef;
+    --amber:       #8a6100;
+    --amber-wash:  #fdf2dc;
+    --code-bg:     #f0f3f9;
+    --shot-bg:     #e9edf5;
+    --shadow:      0 1px 2px rgba(20,30,55,.05), 0 8px 24px rgba(20,30,55,.06);
+
+    --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --display: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0f1115;
+      --surface:     #171a20;
+      --surface-2:   #1d222a;
+      --ink:         #e8eaed;
+      --ink-soft:    #98a1ad;
+      --ink-faint:   #78818e;
+      --rule:        #262b33;
+      --rule-strong: #333a45;
+      --blue:        #6fb0ff;
+      --blue-wash:   #142234;
+      --rec:         #ff6b81;
+      --rec-wash:    #2a1419;
+      --mint:        #3ecf8e;
+      --mint-wash:   #10241c;
+      --amber:       #ffc857;
+      --amber-wash:  #26200f;
+      --code-bg:     #12151b;
+      --shot-bg:     #0b0d11;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0f1115;
+    --surface:     #171a20;
+    --surface-2:   #1d222a;
+    --ink:         #e8eaed;
+    --ink-soft:    #98a1ad;
+    --ink-faint:   #78818e;
+    --rule:        #262b33;
+    --rule-strong: #333a45;
+    --blue:        #6fb0ff;
+    --blue-wash:   #142234;
+    --rec:         #ff6b81;
+    --rec-wash:    #2a1419;
+    --mint:        #3ecf8e;
+    --mint-wash:   #10241c;
+    --amber:       #ffc857;
+    --amber-wash:  #26200f;
+    --code-bg:     #12151b;
+    --shot-bg:     #0b0d11;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  /* ---------------------------------------------------------------- base */
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 400 16.5px/1.65 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 3px;
+  }
+
+  code, kbd, .mono { font-family: var(--mono); font-size: .88em; }
+
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .08em .38em;
+    overflow-wrap: anywhere;
+  }
+
+  kbd {
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: .1em .45em;
+    font-size: .82em;
+    white-space: nowrap;
+  }
+
+  /* ---------------------------------------------------------------- shell */
+  .shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 28px 96px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0 56px;
+  }
+
+  @media (min-width: 1080px) {
+    .shell { grid-template-columns: 216px minmax(0, 1fr); }
+    .masthead { grid-column: 1 / -1; }
+  }
+
+  /* ---------------------------------------------------------------- masthead */
+  .masthead {
+    padding: 64px 0 36px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 44px;
+  }
+
+  .eyebrow {
+    font: 500 11.5px/1 var(--mono);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 18px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2.4rem, 6vw, 3.6rem);
+    line-height: 1.03;
+    letter-spacing: -.022em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: 1.15rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 60ch;
+    margin: 0 0 30px;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .fact {
+    flex: 1 1 168px;
+    padding: 14px 18px;
+    border-right: 1px solid var(--rule);
+  }
+  .fact:last-child { border-right: 0; }
+
+  .fact dt {
+    font: 500 10.5px/1 var(--mono);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 7px;
+  }
+  .fact dd {
+    margin: 0;
+    font-size: .83rem;
+    line-height: 1.45;
+    font-family: var(--mono);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------------------------------------------------------------- toc */
+  .toc { display: none; }
+
+  @media (min-width: 1080px) {
+    .toc {
+      display: block;
+      position: sticky;
+      top: 28px;
+      align-self: start;
+      max-height: calc(100vh - 56px);
+      overflow-y: auto;
+      padding-bottom: 20px;
+    }
+    .toc h2 {
+      font: 500 10.5px/1 var(--mono);
+      letter-spacing: .13em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin: 0 0 12px;
+    }
+    .toc ol { list-style: none; margin: 0 0 22px; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+    .toc a {
+      display: block;
+      padding: 5px 10px 5px 11px;
+      border-left: 2px solid var(--rule);
+      color: var(--ink-soft);
+      text-decoration: none;
+      font-size: .875rem;
+      line-height: 1.35;
+    }
+    .toc a:hover { color: var(--ink); background: var(--surface); }
+    .toc a[aria-current="true"] {
+      color: var(--blue);
+      border-left-color: var(--blue);
+      font-weight: 500;
+    }
+    .toc .num {
+      font-family: var(--mono);
+      font-size: .78em;
+      color: var(--ink-faint);
+      margin-right: 7px;
+    }
+    .toc a[aria-current="true"] .num { color: var(--blue); }
+  }
+
+  /* ---------------------------------------------------------------- prose */
+  main { min-width: 0; }
+
+  section { margin-bottom: 68px; scroll-margin-top: 24px; }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.85rem;
+    line-height: 1.15;
+    letter-spacing: -.017em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+
+  h2 .step-num {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: .95rem;
+    letter-spacing: 0;
+    color: var(--blue);
+    background: var(--blue-wash);
+    border-radius: 6px;
+    padding: 3px 9px;
+    flex: none;
+    transform: translateY(-2px);
+  }
+
+  h3 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 1.16rem;
+    letter-spacing: -.01em;
+    margin: 34px 0 8px;
+    text-wrap: balance;
+  }
+
+  .lede { color: var(--ink-soft); font-size: 1.03rem; margin: 0 0 22px; max-width: 68ch; }
+
+  p, li { max-width: 68ch; }
+  p { margin: 0 0 16px; }
+
+  ul, ol.steps { padding-left: 20px; margin: 0 0 18px; }
+  li { margin-bottom: 9px; }
+  li::marker { color: var(--ink-faint); }
+
+  strong { font-weight: 600; }
+
+  /* ---------------------------------------------------------------- figures */
+  figure {
+    margin: 30px 0 34px;
+    max-width: none;
+  }
+
+  .shot {
+    display: block;
+    width: 100%;
+    background: var(--shot-bg);
+    border: 1px solid var(--rule-strong);
+    border-radius: 10px;
+    overflow: hidden;
+    padding: 0;
+    cursor: zoom-in;
+    box-shadow: var(--shadow);
+  }
+  .shot img { display: block; width: 100%; height: auto; }
+
+  figcaption {
+    margin-top: 11px;
+    font-size: .865rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 72ch;
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* ---------------------------------------------------------------- notes */
+  .note {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--blue);
+    background: var(--surface);
+    border-radius: 0 8px 8px 0;
+    padding: 15px 18px;
+    margin: 24px 0;
+    max-width: 72ch;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .tag {
+    font: 500 10.5px/1 var(--mono);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--blue);
+    display: block;
+    margin-bottom: 8px;
+  }
+  .note.warn { border-left-color: var(--amber); }
+  .note.warn .tag { color: var(--amber); }
+  .note.care { border-left-color: var(--rec); }
+  .note.care .tag { color: var(--rec); }
+
+  /* ---------------------------------------------------------------- pills */
+  .pill {
+    display: inline-block;
+    font: 500 .72rem/1.5 var(--mono);
+    letter-spacing: .06em;
+    padding: 1px 8px;
+    border-radius: 999px;
+    vertical-align: 1px;
+    white-space: nowrap;
+  }
+  .pill-rec { background: var(--rec-wash); color: var(--rec); }
+  .pill-ok  { background: var(--mint-wash); color: var(--mint); }
+  .pill-pick{ background: var(--blue-wash); color: var(--blue); }
+
+  /* ---------------------------------------------------------------- tables */
+  .scroller { overflow-x: auto; margin: 20px 0 24px; border: 1px solid var(--rule); border-radius: 9px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .91rem; min-width: 480px; }
+  th, td { text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font: 500 10.5px/1.4 var(--mono);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.mono, th.mono { font-family: var(--mono); font-size: .85rem; white-space: nowrap; }
+  td p { margin: 0; max-width: none; }
+
+  /* ---------------------------------------------------------------- codeblock */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 9px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 0 0 20px;
+    font-family: var(--mono);
+    font-size: .84rem;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  /* ---------------------------------------------------------------- ladder */
+  .ladder { list-style: none; padding: 0; margin: 22px 0 26px; counter-reset: rung; }
+  .ladder li {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 14px;
+    padding: 12px 0;
+    border-top: 1px solid var(--rule);
+    max-width: 72ch;
+    margin: 0;
+  }
+  .ladder li:last-child { border-bottom: 1px solid var(--rule); }
+  .ladder li::before {
+    counter-increment: rung;
+    content: counter(rung);
+    font: 500 .8rem/1.9 var(--mono);
+    color: var(--ink-faint);
+    text-align: right;
+  }
+  /* Both paragraphs sit in the second column; the counter owns the first. */
+  .ladder .what { grid-column: 2; margin: 0; }
+  .ladder .why { grid-column: 2; margin: 3px 0 0; font-size: .88rem; color: var(--ink-soft); }
+
+  /* ---------------------------------------------------------------- lightbox */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 8, 12, .88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    z-index: 90;
+    cursor: zoom-out;
+    border: 0;
+    width: 100%;
+  }
+  .lightbox img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.55);
+  }
+
+  footer {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+    color: var(--ink-faint);
+    font-size: .875rem;
+  }
+  footer p { max-width: 72ch; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <p class="eyebrow">User guide</p>
+    <h1>Playwright Studio</h1>
+    <p class="standfirst">
+      Click through a form once. The studio watches, turns what you did into steps you can read and
+      edit, and replays them on demand — or hands the whole thing over as a test file for your real
+      suite.
+    </p>
+    <dl class="facts">
+      <div class="fact">
+        <dt>Lives at</dt>
+        <dd>C:\Development\Playwright</dd>
+      </div>
+      <div class="fact">
+        <dt>Run it</dt>
+        <dd>PlaywrightStudio.slnx → F5</dd>
+      </div>
+      <div class="fact">
+        <dt>Opens on</dt>
+        <dd>http://localhost:5050</dd>
+      </div>
+      <div class="fact">
+        <dt>Your tests live in</dt>
+        <dd>%LOCALAPPDATA%\PlaywrightStudio</dd>
+      </div>
+    </dl>
+  </header>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#what">What it is</a></li>
+      <li><a href="#home">The home screen</a></li>
+      <li><a href="#browsers">Which browser</a></li>
+      <li><a href="#record"><span class="num">01</span>Record</a></li>
+      <li><a href="#steps"><span class="num">02</span>Read the steps</a></li>
+      <li><a href="#checks"><span class="num">03</span>Add checks</a></li>
+      <li><a href="#run"><span class="num">04</span>Run it</a></li>
+      <li><a href="#export"><span class="num">05</span>Export it</a></li>
+      <li><a href="#manuals">Manuals</a></li>
+      <li><a href="#selectors">Selectors</a></li>
+      <li><a href="#variables">Variables</a></li>
+      <li><a href="#reference">Step reference</a></li>
+      <li><a href="#settings">Settings</a></li>
+      <li><a href="#storage">Where things live</a></li>
+      <li><a href="#robust">Surviving replay</a></li>
+      <li><a href="#trouble">When it misbehaves</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ------------------------------------------------------------ what -->
+    <section id="what">
+      <h2>What it is</h2>
+      <p class="lede">
+        A local web app that records browser journeys and plays them back.
+      </p>
+      <p>
+        You give it a URL. It opens a real browser, and everything you do in that window —
+        clicking, typing, ticking boxes, picking from dropdowns — arrives in the studio as a list of
+        steps. The steps are plain and editable: an action, a selector, a value. Nothing is hidden
+        in a binary recording.
+      </p>
+      <p>
+        Afterwards you can replay the journey whenever you want, watch it pass or fail step by step
+        with screenshots, and export the whole thing as an NUnit, Playwright Test, or pytest file
+        that runs in a normal test project.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/scenarios.png">
+          <img src="img/scenarios.png" alt="The scenarios list, showing two saved scenarios as cards with step counts and last run status." loading="lazy">
+        </button>
+        <figcaption>
+          The scenarios list. Each card shows how many steps it holds, how many of those are checks,
+          and how the last replay went. <b>New &amp; record</b> creates a scenario and opens the
+          browser in one move.
+        </figcaption>
+      </figure>
+
+      <div class="note">
+        <span class="tag">Start here</span>
+        <p>
+          On first launch the studio seeds one worked example, <b>Demo signup&nbsp;— happy path</b>,
+          pointed at a practice form it serves itself at <code>/demo-form.html</code>. Open it and
+          press <b>Run</b> before recording anything of your own — it takes about three seconds and
+          proves the whole chain works on your machine.
+        </p>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ home -->
+    <section id="home">
+      <h2>The home screen</h2>
+      <p class="lede">
+        A junction, not a dashboard. Every part of the studio is one click from here.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/home.png">
+          <img src="img/home.png" alt="The home screen: square tiles for Record, Import, Scenarios, Runs, Manuals, Settings and Help, with counts under the ones that hold things." loading="lazy">
+        </button>
+        <figcaption>
+          Tiles carry a count where one is useful, so you can see there are four runs waiting
+          without opening the page. Hover a tile for a one-line reminder of what it does.
+        </figcaption>
+      </figure>
+
+      <p>
+        <b>Record</b> creates a scenario and opens the browser in one move — the same as
+        <b>New &amp; record</b> on the scenarios page. <b>Import</b> takes a scenario json somebody
+        exported. The rest are destinations: the same five entries as the sidebar, which stays
+        available on every screen.
+      </p>
+    </section>
+
+    <!-- ------------------------------------------------------------ browsers -->
+    <section id="browsers">
+      <h2>Which browser</h2>
+      <p class="lede">
+        Edge on its own is enough. So is Chrome. Nothing has to be downloaded.
+      </p>
+      <p>
+        Playwright normally ships its own browser builds, but it can also drive a browser you
+        already have. In <b>Settings → Browser</b>, the two “(installed)” options —
+        <b>Microsoft Edge</b> and <b>Google Chrome</b> — launch what is on the machine already.
+        Recording, replay, assertions, screenshots and traces all work this way with an empty
+        Playwright cache.
+      </p>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr><th>Setting</th><th>What it launches</th><th class="mono">Download?</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">chromium</td><td>Playwright's own Chromium build</td><td>Yes, ~150&nbsp;MB</td></tr>
+            <tr><td class="mono">msedge</td><td>The Edge installed on this machine</td><td>No</td></tr>
+            <tr><td class="mono">chrome</td><td>The Chrome installed on this machine</td><td>No</td></tr>
+            <tr><td class="mono">firefox</td><td>Playwright's own Firefox build</td><td>Yes</td></tr>
+            <tr><td class="mono">webkit</td><td>Playwright's own WebKit build (Safari's engine)</td><td>Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Both Chromium and Edge are ready on this machine right now. Edge is the better default if
+        you want tests running against the browser your users actually have.
+      </p>
+
+      <div class="note warn">
+        <span class="tag">Two catches</span>
+        <p>
+          Don't press <b>Install msedge</b> in Settings — that runs Edge's own installer, which you
+          don't need. The <b>Check</b> button is the useful one: it starts the browser and reports
+          the version back.
+        </p>
+        <p>
+          <b>Record video of the run</b> is the one feature with an outside dependency. Playwright
+          records WebM, and the studio transcodes that to mp4 — but the ffmpeg Playwright bundles is
+          a stripped build with no mp4 muxer at all. Switch video on and Settings offers
+          <b>Download ffmpeg</b>, which fetches a static build into the studio's own tools folder;
+          nothing is installed machine-wide. Until one is there the video stays <code>.webm</code>
+          and the run log says why.
+        </p>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ record -->
+    <section id="record">
+      <h2><span class="step-num">01</span>Record a journey</h2>
+      <p class="lede">
+        Press record, drive the form like a person, stop. That's the whole loop.
+      </p>
+      <p>
+        Hit <b>New &amp; record</b> on the scenarios page, or <b>Record more steps</b> inside a
+        scenario you already have. A real browser window opens at your start URL with a small
+        toolbar pinned to the bottom-right corner.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/recorder-toolbar.png">
+          <img src="img/recorder-toolbar.png" alt="The demo signup form in a browser, with a dark recorder toolbar in the bottom-right corner showing a pulsing REC badge, pause, assert and note buttons." loading="lazy">
+        </button>
+        <figcaption>
+          The recorder toolbar, bottom-right. It is injected into the page by the studio and lives in
+          a shadow root — it is never part of your application, and clicking it never produces a step.
+        </figcaption>
+      </figure>
+
+      <h3>What the toolbar does</h3>
+      <ul>
+        <li><span class="pill pill-rec">REC</span> — a pulsing dot while capture is live.</li>
+        <li><kbd>⏸</kbd> — pause. Click around, log in, dismiss a cookie banner; none of it is recorded. Press again to resume.</li>
+        <li><b>✔ Assert</b> — opens the checks menu. Covered in <a href="#checks">step 3</a>.</li>
+        <li><b>✎</b> — type a note that lands in the step list as a comment, so future-you knows why a step is there.</li>
+      </ul>
+
+      <h3>What gets captured</h3>
+      <ul>
+        <li>Clicks, double-clicks and right-clicks — on the meaningful element, so clicking the label inside a button records the button.</li>
+        <li>Typing, collapsed into <b>one</b> <code>Fill</code> per field rather than one step per keystroke.</li>
+        <li>Checkboxes and radios as <code>Check</code> / <code>Uncheck</code>, dropdowns as <code>Select</code> with the option label in the description.</li>
+        <li><kbd>Enter</kbd> and <kbd>Esc</kbd> as <code>Press</code> steps — the ones that usually submit or dismiss something.</li>
+        <li>Navigation, but only when it wasn't caused by the click you just made. A click that loads a page is one step, not two.</li>
+      </ul>
+
+      <h3>Fast-forwarding a form</h3>
+      <p>
+        Re-typing the first eight fields by hand every time you want to record the ninth gets old.
+        While the window is open, the <b>⏩</b> on any step replays the saved steps
+        <em>into that same window</em>, up to and including that one — or <b>Play all here</b> on the
+        recorder bar for the lot. The form fills itself, the window is handed back to you, and
+        recording carries on from where the playback stopped.
+      </p>
+      <p>
+        Capture is paused while it plays, so the studio does not record its own playback as a second
+        set of steps.
+      </p>
+
+      <p>
+        When you're done, <b>Stop &amp; keep</b> writes the captured steps into the scenario. Closing
+        the browser window does exactly the same thing — nothing is lost either way, and a
+        <b>Discard</b> button is there if the take was no good.
+      </p>
+
+      <div class="note care">
+        <span class="tag">Passwords</span>
+        <p>
+          A password field is never written into a step. The recorder lifts the value into a
+          scenario variable and the step reads <code>{{password}}</code> instead. The variable
+          itself is masked in the UI — but it <em>is</em> stored in plain text in the scenario's
+          json file, so blank it out before you commit or share that file.
+        </p>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ steps -->
+    <section id="steps">
+      <h2><span class="step-num">02</span>Read the steps</h2>
+      <p class="lede">
+        A recording is a starting point, not a finished test. This is where you make it yours.
+      </p>
+      <p>
+        Every step shows its action, a plain-language label the recorder wrote from the field's own
+        label, the selector it settled on, and the value. Untick a step to skip it without deleting
+        it; drag it up or down with the arrows; press ▶ on any row to replay <em>from</em> that row
+        while you're debugging the tail of a journey.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/editor.png">
+          <img src="img/editor.png" alt="The scenario editor: a record button, a numbered list of steps with selectors and values, and a right-hand rail with notes, variables and run options." loading="lazy">
+        </button>
+        <figcaption>
+          The editor. Steps on the left, and a rail on the right for notes, variables and the run
+          options you change most often. Everything saves as you go.
+        </figcaption>
+      </figure>
+
+      <p>
+        Opening a step with the pencil gives you the full picture — including every other selector
+        the recorder considered for that element.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/step-dialog.png">
+          <img src="img/step-dialog.png" alt="The edit step dialog showing action, label, selector, and a row of alternative selector chips including #terms and role=checkbox." loading="lazy">
+        </button>
+        <figcaption>
+          One click on any chip swaps it in, and the one you replaced joins the alternatives. Handy
+          when a <code>data-testid</code> is about to be renamed and you'd rather hang the test on
+          <code>role=checkbox[name="I accept the terms"]</code>.
+        </figcaption>
+      </figure>
+
+      <h3>Under Advanced</h3>
+      <ul>
+        <li><b>Timeout</b> — override the default for one slow step instead of slowing every step down.</li>
+        <li><b>Wait before</b> — a blunt pause, for when an animation has to finish.</li>
+        <li><b>Carry on if this fails</b> — for the step that dismisses a banner that isn't always there.</li>
+        <li><b>Screenshot after this step</b> — capture just the moment that matters, without turning on screenshots for everything.</li>
+      </ul>
+
+      <div class="note">
+        <span class="tag">While recording</span>
+        <p>
+          With the recorder still live, the crosshair button on a step highlights that selector's
+          element in the real browser window and tells you how many things it matched. “1 match” is
+          what you want; “4 matches” means the step will act on the first one.
+        </p>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ checks -->
+    <section id="checks">
+      <h2><span class="step-num">03</span>Add checks</h2>
+      <p class="lede">
+        A journey that clicks through without asserting anything only proves nothing crashed.
+      </p>
+      <p>
+        Press <b>✔ Assert</b> on the browser toolbar — or <b>Add check</b> in the studio — and pick
+        what kind of check you want. The page goes into <span class="pill pill-pick">PICK</span>
+        mode: a bar appears at the top, and whatever you hover is outlined with its selector shown
+        on a tag.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/recorder-pick.png">
+          <img src="img/recorder-pick.png" alt="The demo form in pick mode: a hint bar reads 'Click an element to add AssertVisible, Esc to cancel', and the Create account button is outlined in cyan with the selector data-testid=submit-signup shown above it." loading="lazy">
+        </button>
+        <figcaption>
+          Pick mode. Clicking records the check instead of pressing the button — your click is
+          swallowed, so nothing submits by accident. <kbd>Esc</kbd> backs out.
+        </figcaption>
+      </figure>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr><th>Check</th><th>Passes when</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">AssertVisible</td><td>The element is on screen and visible.</td></tr>
+            <tr><td class="mono">AssertHidden</td><td>The element is gone or hidden — a spinner that finished, an error that cleared.</td></tr>
+            <tr><td class="mono">AssertText</td><td>The element's text matches. Prefilled with what was on screen when you picked it.</td></tr>
+            <tr><td class="mono">AssertValue</td><td>An input holds a particular value.</td></tr>
+            <tr><td class="mono">AssertChecked</td><td>A checkbox or radio is in the state you expect.</td></tr>
+            <tr><td class="mono">AssertUrl</td><td>The address bar matches — a redirect landed where it should.</td></tr>
+            <tr><td class="mono">AssertTitle</td><td>The page title matches.</td></tr>
+            <tr><td class="mono">AssertCount</td><td>A selector matches exactly N elements — five rows in a table, no validation errors.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>How text is matched</h3>
+      <p>The expected value in a text, value, url or title check reads three ways:</p>
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr><th class="mono">You write</th><th>It means</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">Welcome back</td><td>Contains, ignoring case. The default, and usually what you want.</td></tr>
+            <tr><td class="mono">=Welcome back</td><td>Exact match, after trimming whitespace.</td></tr>
+            <tr><td class="mono">/order-\d+/</td><td>Regular expression.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Checks retry until the step's timeout, so a value that arrives half a second late still
+        passes. You don't need to sprinkle waits around them.
+      </p>
+    </section>
+
+    <!-- ------------------------------------------------------------ run -->
+    <section id="run">
+      <h2><span class="step-num">04</span>Run it</h2>
+      <p class="lede">
+        Press Run. Watch each step go green, or find out exactly which one didn't.
+      </p>
+      <p>
+        Results appear against the steps as the run moves through them. <b>Run</b> uses whatever
+        Headless is set to and works in its own throwaway browser.
+      </p>
+      <p>
+        <b>Watch</b> uses a window you can see. A bar appears at the top of the page showing which
+        step is running, with its own <b>Stop</b> button, and the window is left open at whatever
+        point the run reached — so you can stop part-way and carry on by hand from there.
+      </p>
+
+      <h3>Running in your own browser</h3>
+      <p>
+        By default the studio drives a private browser of its own. Switch on
+        <b>Use the browser I am already in</b> under Settings → Browser and runs instead open a tab
+        in <em>your</em> browser: your logins, your cookies, your extensions. Stop the run and the
+        tab is still sitting there for you to carry on in.
+      </p>
+      <p>
+        There is one catch. A browser started the normal way cannot be driven — Chromium refuses
+        remote debugging against your everyday profile. <b>Open a debuggable browser</b> starts one
+        with its own profile folder and the debugging port switched on; use that window for the
+        studio and for whatever you are testing, and the two share it. <b>Check connection</b> tells
+        you whether the studio can see it.
+      </p>
+      <p>
+        Video and trace are skipped in this mode: both are fixed when a browser context is created,
+        and that context is yours, not the studio's.
+      </p>
+      <p>
+        Add some <b>slow motion</b> in the right-hand rail when you want to follow along.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/editor-run.png">
+          <img src="img/editor-run.png" alt="The editor after a run, with green check icons against each step and a Last run panel reporting eleven passed." loading="lazy">
+        </button>
+        <figcaption>
+          A finished run in the editor, with a summary in the rail. <b>Full report</b> opens the
+          detail.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <button class="shot" data-full="img/run-report.png">
+          <img src="img/run-report.png" alt="A run report listing each step with a green tick, the selector used, how many milliseconds it took, and a screenshot thumbnail." loading="lazy">
+        </button>
+        <figcaption>
+          The report keeps the selector each step used, its timing, and a screenshot of the page at
+          that moment.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <button class="shot" data-full="img/runs.png">
+          <img src="img/runs.png" alt="The run history: one row per replay with its result, scenario, step tally, duration, browser and when it ran." loading="lazy">
+        </button>
+        <figcaption>
+          Every replay is kept under <b>Runs</b> until you clear them, so you can tell a scenario
+          that has always been flaky from one that broke this morning. Click a row for its report.
+        </figcaption>
+      </figure>
+
+      <h3 id="manuals">Turning a run into a user manual</h3>
+      <p>
+        <b>User manual</b> on a run report drafts a manual and opens it for editing — it does not
+        hand you a PDF straight away. Manuals are their own thing, listed under <b>Manuals</b> in
+        the sidebar, and they keep their own copy of every picture, so clearing your run history
+        never guts a document you have written.
+      </p>
+      <p>
+        In the editor you can rewrite any instruction, reorder steps, add or delete them, switch a
+        step out of the document without losing it, edit the title and introduction, and
+        <b>replace any picture</b> with your own — a cropped shot, an annotated one, a photo. Press
+        <b>Preview</b> to see the finished document, and <b>Download PDF</b> when it reads right.
+      </p>
+      <p>
+        Every step has a <b>notes</b> button — on saved steps and on steps as they are being
+        recorded, which is when you still remember why the step exists. Write what a reader should
+        be told to do, in markdown; there is a live preview beside the box, and a switch to leave
+        plumbing steps out of the manual entirely.
+      </p>
+      <p>
+        The draft comes out as numbered steps: your instructions, and under each one the screenshot
+        that step actually produced. Waits and
+        scrolls are dropped, skipped steps are dropped, and a step you never wrote anything for
+        falls back to a plain description — <i>"Choose "za" in "Country"."</i> — so the document is
+        never blank where you forgot.
+      </p>
+      <p>
+        Turn on <b>Screenshot every step</b> in Settings before the run, or the manual will tell you
+        how many steps came out without a picture.
+      </p>
+      <p>
+        Addresses come out as <b>links</b>, not as walls of query string — a reader gets
+        <i>"Click the sign-in link below. It takes you to login.microsoftonline.com to sign in."</i>
+        with a clickable link beneath, while the full address lives in the link itself and still
+        works when clicked in the PDF.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/manuals.png">
+          <img src="img/manuals.png" alt="The manuals list, showing a saved manual as a card with its step count and how many steps carry a picture." loading="lazy">
+        </button>
+        <figcaption>
+          Saved manuals live under <b>Manuals</b>. A card shows how many steps it has and how many
+          of those are illustrated, so a document that lost its pictures is obvious at a glance.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <button class="shot" data-full="img/manual-editor.png">
+          <img src="img/manual-editor.png" alt="The manual editor: a step with its instruction in markdown on the left, a live preview beneath it, and the step's screenshot on the right with buttons to replace or remove the picture." loading="lazy">
+        </button>
+        <figcaption>
+          Each step is an instruction in markdown with a live preview, and the picture that step
+          produced. <b>Replace picture</b> swaps in your own — cropped, annotated, or a photograph —
+          and the file is copied into the manual, so the original can move or be deleted afterwards.
+        </figcaption>
+      </figure>
+
+      <h3>Capturing pages for site duplication</h3>
+      <p>
+        The small camera on a scenario card turns on page capture. Switching it on asks where the
+        files should go — it suggests a folder beside the app, with quick picks for your data folder
+        or Documents, and warns you if the path sits under <code>bin</code> where a rebuild would
+        wipe it. Each scenario remembers its own folder. With capture on, a run saves every
+        <em>distinct</em> page the journey reaches — a full-page screenshot and the html behind it:
+      </p>
+      <pre><code>…\Videos\..\Captures\acme-site-walk\
+├── 01-localhost-home.png / .html
+├── 02-localhost-about.png / .html
+├── 03-localhost-contact.png / .html
+└── pages.md                     what was captured, and from which url</code></pre>
+      <p>
+        One capture per url, so a journey that does five things on one page still saves it once.
+        The screenshot is full-page rather than viewport-sized, and the html is the live DOM after
+        scripts have run — between them, enough to rebuild a page later.
+        <code>Studio:CaptureFolder</code> in <code>appsettings.json</code> changes the default the
+        prompt suggests.
+      </p>
+
+      <h3>When a step fails</h3>
+      <p>
+        The run stops there, the remaining steps are marked skipped, and the failure explains itself
+        in terms of what was actually on the page:
+      </p>
+      <pre><code>Text is "Welcome Jane. You are on the pro plan, and we will
+mail jane+9546@example.com.", expected to contain "enterprise plan"</code></pre>
+      <p>
+        A screenshot of the failing moment is captured automatically. If you'd rather step through
+        it, turn on <b>Record trace.zip</b>, re-run, and open the trace from the report — it gives
+        you a frame-by-frame timeline with the DOM at every step:
+      </p>
+      <pre><code>playwright show-trace trace.zip</code></pre>
+    </section>
+
+    <!-- ------------------------------------------------------------ export -->
+    <section id="export">
+      <h2><span class="step-num">05</span>Export it</h2>
+      <p class="lede">
+        When a journey earns its place in the real suite, take it with you.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/export.png">
+          <img src="img/export.png" alt="The export dialog with tabs for C# NUnit, TypeScript, Python and scenario json, showing generated NUnit code." loading="lazy">
+        </button>
+        <figcaption>
+          Four tabs, a copy button and a download button. The generated file is complete — imports,
+          fixture, constants and all.
+        </figcaption>
+      </figure>
+
+      <ul>
+        <li><b>C# / NUnit</b> — a <code>PageTest</code> fixture for a project referencing <code>Microsoft.Playwright.NUnit</code>.</li>
+        <li><b>TypeScript</b> — a spec for <code>@playwright/test</code>.</li>
+        <li><b>Python</b> — a pytest test needing <code>pytest-playwright</code>.</li>
+        <li><b>Scenario json</b> — the studio's own format. Import it on another machine to get the scenario back, steps and alternatives intact.</li>
+      </ul>
+
+      <p>
+        Variables survive the trip as real constants, and the built-ins become the target language's
+        equivalent rather than a literal <code>{{random:4}}</code> left in your source:
+      </p>
+      <pre><code>private const string Plan = "pro";
+
+await Page.Locator("#email").First.FillAsync(
+    "jane+" + Random.Shared.Next(0, 10000).ToString("0000") + "@example.com");
+await Page.Locator("input[name=\"plan\"][value=\"" + Plan + "\"]").First.CheckAsync();
+await Expect(Page.Locator("#successDetail").First).ToContainTextAsync(Plan + " plan");</code></pre>
+    </section>
+
+    <!-- ------------------------------------------------------------ selectors -->
+    <section id="selectors">
+      <h2>How selectors are chosen</h2>
+      <p class="lede">
+        This is the part that decides whether a test still passes next month.
+      </p>
+      <p>
+        For every element you touch, the recorder builds a list of candidates, throws away any that
+        don't match exactly one element on the page, and takes the best survivor. The rest are kept
+        on the step so you can swap to them later.
+      </p>
+
+      <ol class="ladder">
+        <li>
+          <p class="what"><code>[data-testid="submit-signup"]</code></p>
+          <p class="why">Test ids win, always — they exist precisely so tests can hold onto them. Also reads <code>data-test</code>, <code>data-qa</code>, <code>data-cy</code> and <code>data-automation-id</code>.</p>
+        </li>
+        <li>
+          <p class="what"><code>#email</code></p>
+          <p class="why">
+            An id, but only one that doesn't look machine-generated. Ids full of hex, long digit
+            runs, a random-looking tail, or a framework prefix — <code>:r</code>, <code>mat-</code>,
+            <code>mud</code> — get demoted below <code>role=</code>, because they change on every
+            render. MudBlazor's <code>#mudinput08267ls7</code> is the classic trap: it looks like a
+            perfectly good id and is gone by the time you replay.
+          </p>
+        </li>
+        <li>
+          <p class="what"><code>input[name="plan"][value="pro"]</code></p>
+          <p class="why">Form attributes. Radios and checkboxes share a name, so the value is what tells them apart. Then <code>[aria-label]</code> and <code>[placeholder]</code>.</p>
+        </li>
+        <li>
+          <p class="what"><code>role=button[name="Create account"]</code></p>
+          <p class="why">Role and accessible name — what a screen reader would call it. Survives restyling and markup churn, and breaks loudly if the label changes, which is usually correct.</p>
+        </li>
+        <li>
+          <p class="what"><code>#signup &gt; fieldset &gt; label:nth-of-type(2) &gt; input</code></p>
+          <p class="why">A css path, and only because nothing better existed. If you see one of these, it's a hint that the element could use a test id.</p>
+        </li>
+      </ol>
+
+      <div class="note">
+        <span class="tag">Worth doing</span>
+        <p>
+          Add <code>data-testid</code> to the handful of controls your tests depend on. The recorder
+          will pick them up first, and those steps stop caring about your markup entirely.
+        </p>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ variables -->
+    <section id="variables">
+      <h2>Variables</h2>
+      <p class="lede">
+        For the bits that shouldn't be the same every run.
+      </p>
+      <p>
+        Write <code>{{name}}</code> in any step value — or inside a selector — and define the name in
+        the scenario's Variables panel. The editor warns you about any name that isn't defined.
+        These built-ins need no definition and are resolved fresh on every run:
+      </p>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr><th class="mono">Placeholder</th><th>Becomes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">{{guid}}</td><td>A fresh guid</td></tr>
+            <tr><td class="mono">{{randomemail}}</td><td><span class="mono">test+418203@example.com</span></td></tr>
+            <tr><td class="mono">{{random:6}}</td><td>Six random digits, zero-padded</td></tr>
+            <tr><td class="mono">{{randomtext:8}}</td><td>Eight random letters</td></tr>
+            <tr><td class="mono">{{now}}</td><td><span class="mono">2026-09-13 10:40:57</span></td></tr>
+            <tr><td class="mono">{{now:HH\:mm}}</td><td>A custom format — escape the colon</td></tr>
+            <tr><td class="mono">{{today}}</td><td><span class="mono">2026-09-13</span></td></tr>
+            <tr><td class="mono">{{timestamp}}</td><td>Unix milliseconds</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        A signup form that rejects duplicate addresses is the obvious case: put
+        <code>jane+{{random:4}}@example.com</code> in the email step and the scenario stops failing
+        on its second run.
+      </p>
+    </section>
+
+    <!-- ------------------------------------------------------------ reference -->
+    <section id="reference">
+      <h2>Step reference</h2>
+      <p class="lede">
+        Everything you can add by hand with <b>Add step</b>, not only what the recorder produces.
+      </p>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr><th>Group</th><th>Steps</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Do</b></td>
+              <td class="mono">Navigate · Click · DoubleClick · RightClick · Fill · Type · Press · Select · Check · Uncheck · Hover · Upload · Focus · ScrollIntoView</td>
+            </tr>
+            <tr>
+              <td><b>Wait</b></td>
+              <td class="mono">WaitForSelector · WaitForHidden · WaitForUrl · WaitForTimeout</td>
+            </tr>
+            <tr>
+              <td><b>Check</b></td>
+              <td class="mono">AssertVisible · AssertHidden · AssertText · AssertValue · AssertChecked · AssertUrl · AssertTitle · AssertCount</td>
+            </tr>
+            <tr>
+              <td><b>Other</b></td>
+              <td class="mono">Screenshot · Comment</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        <code>Fill</code> sets a field's value in one go; <code>Type</code> presses it in key by key,
+        which matters for autocompletes that listen to each keystroke. <code>Upload</code> needs a
+        full path on this machine — the recorder can only see the file's name, so that's one step you
+        always finish by hand.
+      </p>
+    </section>
+
+    <!-- ------------------------------------------------------------ settings -->
+    <section id="settings">
+      <h2>Settings</h2>
+      <p class="lede">
+        Applies to every run. Recording is always headed and never slowed — you're the one driving.
+      </p>
+
+      <figure>
+        <button class="shot" data-full="img/settings.png">
+          <img src="img/settings.png" alt="The settings page with browser engine, viewport, replay options including timeout and slow motion, and a browser binaries panel." loading="lazy">
+        </button>
+        <figcaption>
+          The <b>Check</b> button under Browser binaries is the quickest way to confirm a browser
+          works before you trust a run that failed for some other reason.
+        </figcaption>
+      </figure>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr><th>Setting</th><th>Why you'd touch it</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Viewport</b></td><td>Record and replay at a fixed size, so a responsive layout behaves the same every time.</td></tr>
+            <tr><td><b>Default step timeout</b></td><td>How long any single step waits before giving up. Raise it for a slow staging server.</td></tr>
+            <tr><td><b>Slow motion</b></td><td>A pause between actions so a headed run is watchable. Costs nothing when headless.</td></tr>
+            <tr><td><b>Ignore https certificate errors</b></td><td>For dev servers with a certificate the browser doesn't trust.</td></tr>
+            <tr><td><b>Signed-in state file</b></td><td>A Playwright <code>storageState</code> json, so runs start already logged in and your scenarios can skip the login journey.</td></tr>
+            <tr><td><b>Leave the browser open after a run</b></td><td>Inspect the end state yourself instead of guessing from a screenshot.</td></tr>
+            <tr>
+              <td><b>Video frame size</b></td>
+              <td>Playwright shrinks video to fit an 800px box unless told otherwise — a 1440×900
+                  viewport lands at 800×500 and the text goes soft. <b>Match viewport</b> keeps it
+                  readable; 720p and 1080p are there for sharing.</td>
+            </tr>
+            <tr>
+              <td><b>Video quality</b></td>
+              <td>How hard the mp4 is compressed. On a filled-in form at 1440×900: small ≈ 75&nbsp;KB,
+                  balanced ≈ 122&nbsp;KB, high ≈ 195&nbsp;KB.</td>
+            </tr>
+            <tr>
+              <td><b>Data folder</b></td>
+              <td>Where scenarios, runs and manuals are kept. <b>Browse</b> opens a folder picker,
+                  and changing it offers to copy what you already have across — see
+                  <a href="#storage">Where things live</a>.</td>
+            </tr>
+            <tr><td><b>C# namespace</b></td><td>What exported fixtures are wrapped in.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ storage -->
+    <section id="storage">
+      <h2>Where things live</h2>
+      <p>
+        Scenarios, runs, screenshots, traces and settings all sit in one folder, deliberately outside
+        the project's <code>bin</code> so that rebuilding the app never deletes your tests:
+      </p>
+      <pre><code>%LOCALAPPDATA%\PlaywrightStudio
+├── settings.json
+├── tools\ffmpeg\ffmpeg.exe      downloaded on demand, for mp4
+├── scenarios\&lt;id&gt;.json          one file per scenario
+└── runs\&lt;timestamp&gt;\
+    ├── run.json                 results, timings, errors
+    ├── step-003-ok.png          screenshots
+    └── trace.zip                when tracing was on</code></pre>
+      <p>
+        Videos are the exception — they land in a <code>Videos</code> folder <b>beside the app
+        itself</b>, named after the scenario and run so you can pick one out in Explorer:
+      </p>
+      <pre><code>…\bin\Debug\net10.0\Videos\demo-signup-happy-path-20260913-184155.mp4</code></pre>
+      <p>
+        That folder sits under <code>bin</code>, so <b>a rebuild clears it</b>. Point
+        <code>Studio:VideoFolder</code> in <code>appsettings.json</code> somewhere permanent if you
+        want to keep them.
+      </p>
+      <p>
+        A scenario file is readable json, so it's fine to commit next to the app it tests — putting
+        the folder inside a repo is a reasonable way to share scenarios with a team.
+      </p>
+
+      <h3>Moving the folder</h3>
+      <p>
+        <b>Settings → Where things are stored</b> has a <b>Browse</b> button that opens a folder
+        picker. Pick somewhere new and the studio asks before doing anything, offering to
+        <b>copy your scenarios, runs and manuals across first</b> — that option is on by default,
+        because changing the folder without it would leave your work behind in the old one.
+      </p>
+      <p>
+        The copy leaves the originals exactly where they were, so a wrong turn costs disk space
+        rather than anything you have recorded. The downloaded ffmpeg is not copied; it re-downloads
+        on demand. The new folder takes effect <b>when the studio next starts</b>, and the page says
+        so rather than leaving you wondering why nothing moved.
+      </p>
+      <div class="note">
+        <span class="tag">Note</span>
+        <p>
+          <code>Studio:DataRoot</code> in <code>appsettings.json</code> still works and still wins.
+          When it is set, the folder cannot be changed in the app and the field says why — clear the
+          setting to take control back in the UI.
+        </p>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ robust -->
+    <section id="robust">
+      <h2>Surviving replay</h2>
+      <p class="lede">
+        The page you replay against is never quite the page you recorded. These are the gaps the
+        studio closes on its own.
+      </p>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr><th>What differs</th><th>What the run does</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>The saved selector stopped matching</b> — an id was regenerated, a label was reworded</td>
+              <td>Falls back to the other selectors the recorder kept for that element, and tells you
+                  which one worked so you can promote it.</td>
+            </tr>
+            <tr>
+              <td><b>The first match is a hidden duplicate</b> — a collapsed mobile nav, an offscreen slide</td>
+              <td>Acts on the first <i>visible</i> match. Hidden-element steps
+                  (<code>AssertHidden</code>, <code>AssertCount</code>, <code>Upload</code>) opt out.</td>
+            </tr>
+            <tr>
+              <td><b>The journey opens a tab</b></td>
+              <td>Follows the new tab and carries on there, and steps back if it closes.</td>
+            </tr>
+            <tr>
+              <td><b>A confirm or alert box appears</b></td>
+              <td>Accepts it — you clicked OK while recording — and notes it in the run log.
+                  Playwright dismisses these by default, which would take the other branch.</td>
+            </tr>
+            <tr>
+              <td><b>A dropdown's option values are environment ids</b></td>
+              <td>Tries the value, then the visible label.</td>
+            </tr>
+            <tr>
+              <td><b>A cookie banner now covers the control</b></td>
+              <td>Cannot click through it — nothing can — but names the element doing the covering
+                  instead of just timing out.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        None of this rescues a step that is simply wrong, and none of it is a substitute for a
+        <code>data-testid</code> on the controls that matter. It buys you runs that fail for real
+        reasons rather than incidental ones.
+      </p>
+    </section>
+
+    <!-- ------------------------------------------------------------ trouble -->
+    <section id="trouble">
+      <h2>When it misbehaves</h2>
+
+      <h3>The recorder captured nothing</h3>
+      <p>
+        Check the toolbar in the browser window. If it reads <b>PAUSED</b>, capture is off — press
+        the pause button again. If there's no toolbar at all, the page never loaded; the status line
+        under the record button in the studio says what went wrong.
+      </p>
+
+      <h3>A step passes alone but fails in sequence</h3>
+      <p>
+        Almost always timing — the previous step's page hasn't settled. Add a
+        <code>WaitForSelector</code> for whatever should be on screen first, rather than a fixed
+        <code>WaitForTimeout</code>, which is slower and still flaky.
+      </p>
+
+      <h3>“4 elements matched, 1 of them visible”</h3>
+      <p>
+        The step worked, but the selector is loose. Actions go to the first <b>visible</b> match
+        rather than the first in the markup — a site's header is often duplicated for mobile and
+        desktop, and the hidden copy usually comes first, so acting on it would just wait forever
+        for something that can never be clicked. Still worth tightening: open the step, try the
+        other selectors on offer, and use the crosshair to get down to one match.
+      </p>
+
+      <h3>A step times out</h3>
+      <p>
+        The message says which of the three things went wrong, so read past the timeout:
+      </p>
+      <ul>
+        <li><b>Nothing on the page matches that selector</b> — the page changed, or the previous
+          step didn't land where you expected.</li>
+        <li><b>None are visible</b> — the element exists but is hidden behind a collapsed menu, a
+          tab you haven't opened, or a modal that isn't up yet. Add a click or a
+          <code>WaitForSelector</code> before it.</li>
+        <li><b>No iframe matched</b> — the step was recorded inside a frame that didn't appear this
+          time, typically a pop-up that only shows on a first visit. Delete the step, or tick
+          <b>Carry on if this fails</b> under Advanced.</li>
+      </ul>
+
+      <h3>A recorded click does nothing on replay</h3>
+      <p>
+        Usually a custom widget that reacts to <code>mousedown</code> or a keystroke rather than a
+        plain click. Swap the step to <code>Focus</code> followed by <code>Press</code>, or to
+        <code>Hover</code> then <code>Click</code> if it's a menu that opens on hover.
+      </p>
+
+      <h3>Known edges</h3>
+      <ul>
+        <li>
+          A cross-origin iframe can't see the <code>&lt;iframe&gt;</code> tag holding it, so the
+          recorder names such a frame by its own <code>name</code> or url instead —
+          <code>iframe[name="edr_l_first"]</code>. A frame with neither falls back to a bare
+          <code>iframe</code>, and on a page with several the run takes the first one.
+        </li>
+        <li>Canvas and custom-drawn widgets have nothing to select — add a check by hand against something near them.</li>
+        <li>One recording at a time. The studio owns a single browser.</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>
+      Playwright Studio — .NET 10 Blazor Server, MudBlazor, Microsoft.Playwright 1.62.
+      Screenshots in this guide are of the real app running against its own demo form.
+    </p>
+  </footer>
+
+</div>
+
+<script>
+  // Click a screenshot to see it full size.
+  (function () {
+    var open = null;
+
+    function close() {
+      if (!open) return;
+      open.remove();
+      open = null;
+      document.removeEventListener('keydown', onKey);
+    }
+
+    function onKey(e) { if (e.key === 'Escape') close(); }
+
+    document.querySelectorAll('.shot').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        close();
+        var src = btn.getAttribute('data-full');
+        var alt = btn.querySelector('img').getAttribute('alt') || '';
+        var box = document.createElement('button');
+        box.className = 'lightbox';
+        box.setAttribute('aria-label', 'Close enlarged screenshot');
+        var img = document.createElement('img');
+        img.src = src;
+        img.alt = alt;
+        box.appendChild(img);
+        box.addEventListener('click', close);
+        document.body.appendChild(box);
+        box.focus();
+        open = box;
+        document.addEventListener('keydown', onKey);
+      });
+    });
+  })();
+
+  // Mark the section you're reading in the contents rail.
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+    if (!links.length || !('IntersectionObserver' in window)) return;
+
+    var byId = {};
+    links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+    var seen = {};
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) { seen[entry.target.id] = entry.isIntersecting; });
+      var current = null;
+      Object.keys(byId).forEach(function (id) { if (!current && seen[id]) current = id; });
+      links.forEach(function (a) {
+        a.setAttribute('aria-current', a.getAttribute('href') === '#' + current ? 'true' : 'false');
+      });
+    }, { rootMargin: '-10% 0px -70% 0px' });
+
+    document.querySelectorAll('main section').forEach(function (s) { observer.observe(s); });
+  })();
+</script>

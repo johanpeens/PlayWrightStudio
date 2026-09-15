@@ -1,0 +1,447 @@
+html, body {
+    background: #0f1115;
+}
+
+/* MudBlazor ships most utilities, but not gap. */
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+
+.studio-appbar {
+    border-bottom: 1px solid #1f242c;
+    backdrop-filter: blur(6px);
+}
+
+.studio-drawer {
+    border-right: 1px solid #1f242c;
+}
+
+.studio-main {
+    background:
+        radial-gradient(900px 420px at 12% -8%, rgba(86, 190, 116, .08), transparent 60%),
+        radial-gradient(700px 380px at 92% 4%, rgba(218, 242, 222, .04), transparent 60%);
+    min-height: 100vh;
+}
+
+.mono, code, pre {
+    font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+}
+
+/* ---------------------------------------------------------------- scenarios */
+
+/* h-100 on the card cannot resolve against a grid item that has no height of its own, so the
+   item becomes the flex container and the card fills it. */
+.card-row > .mud-grid-item {
+    display: flex;
+}
+
+.card-row > .mud-grid-item > * {
+    flex: 1 1 auto;
+    width: 100%;
+}
+
+.scenario-card {
+    transition: border-color .15s ease, transform .15s ease;
+}
+
+.scenario-card:hover {
+    border-color: #3c5a46;
+    transform: translateY(-2px);
+}
+
+.two-lines {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- recorder */
+
+.recorder-bar {
+    border-color: #2a3039;
+    background: linear-gradient(180deg, rgba(255, 107, 129, .05), transparent 70%);
+}
+
+.rec-chip {
+    letter-spacing: .06em;
+    font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- steps */
+
+/* A recorded OAuth url is one unbreakable string. With the table free to size itself, that
+   one cell grew to 2196px, pushed the table to 2799px inside a 763px box, and squeezed the
+   action column down to 58px - so its six buttons stacked and every row became 171px tall.
+   Fixing the layout makes the declared column widths hold and lets the url wrap instead. */
+.step-table table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.step-table td {
+    vertical-align: top;
+    padding-top: 7px !important;
+    padding-bottom: 7px !important;
+    overflow-wrap: anywhere;
+}
+
+/* The buttons belong on one line; they are what set the row height when they wrapped. */
+.step-table td.step-actions {
+    white-space: nowrap;
+}
+
+.step-action {
+    font-size: .78rem;
+    font-weight: 600;
+    letter-spacing: .01em;
+    color: #b8c0cc;
+    white-space: nowrap;
+}
+
+/* A recorded sign-in url runs to hundreds of characters. Wrapping it in full turns one step
+   into a 700px row, and reading it in full is useless anyway - the whole value is on hover and
+   in the step editor. Two lines then ellipsis keeps the list scannable. */
+.step-desc {
+    font-size: .86rem;
+    color: #e2e6ec;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.selector {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    margin-top: 2px;
+    font-size: .72rem;
+    color: #8ab4f8;
+    background: #12171f;
+    border: 1px solid #232b36;
+    border-radius: 4px;
+    padding: 1px 6px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.value {
+    font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+    font-size: .75rem;
+    color: #9fe6c8;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
+
+.step-live {
+    background: rgba(255, 107, 129, .06);
+}
+
+.step-running {
+    background: rgba(79, 195, 247, .08);
+}
+
+/* ---------------------------------------------------------------- misc */
+
+.code-block {
+    background: #0c0f14;
+    border: 1px solid #232830;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: .78rem;
+    line-height: 1.55;
+    color: #d7dde6;
+    overflow: auto;
+    max-height: 58vh;
+    white-space: pre;
+    margin: 0;
+}
+
+.shot-thumb {
+    width: 130px;
+    border-radius: 6px;
+    border: 1px solid #2a3039;
+    display: block;
+}
+
+.shot-thumb:hover {
+    border-color: #56be74;
+}
+
+/* Blazor's own error UI */
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+/* ---------------------------------------------------------------- manuals */
+
+.manual-preview {
+    font-size: .9rem;
+    line-height: 1.55;
+}
+
+.manual-preview p { margin: 0 0 .5em; }
+.manual-preview > :last-child { margin-bottom: 0; }
+
+.manual-preview blockquote {
+    margin: 0 0 .5em;
+    padding: 4px 10px;
+    border-left: 3px solid var(--mud-palette-lines-default, #333);
+    color: #b8c0cc;
+}
+
+.manual-shot {
+    display: block;
+    /* A replaced picture can be any shape; never let a small one blow up to full width. */
+    max-width: 100%;
+    max-height: 420px;
+    width: auto;
+    border: 1px solid #2a3039;
+    border-radius: 6px;
+}
+
+.manual-step-off {
+    opacity: .55;
+}
+
+/* ---------------------------------------------------------------- help */
+
+.help-hero {
+    background:
+        radial-gradient(700px 300px at 0% 0%, rgba(86, 190, 116, .14), transparent 65%),
+        radial-gradient(600px 280px at 100% 0%, rgba(143, 211, 163, .08), transparent 65%);
+    border-color: #262d38;
+}
+
+.help-lede {
+    max-width: 62ch;
+}
+
+/* A quiet label above a heading, so sections read as a sequence rather than a pile. */
+.help-eyebrow {
+    color: #7d8798;
+    letter-spacing: .14em;
+    line-height: 1.2;
+}
+
+.help-section {
+    margin-bottom: 40px;
+}
+
+.help-stage {
+    transition: border-color .15s ease;
+}
+
+.help-stage:hover {
+    border-color: #3c5a46;
+}
+
+.help-num {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #16241b;
+    border: 1px solid #2e523d;
+    color: #8fd3a3;
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.help-table td, .help-table th {
+    vertical-align: top;
+}
+
+.help-table th {
+    font-size: .72rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #7d8798;
+    font-weight: 600;
+}
+
+.help-rank {
+    color: #7d8798;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.help-path {
+    word-break: break-all;
+    background: #12171f;
+    border: 1px solid #232b36;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: .78rem;
+    color: #8ab4f8;
+}
+
+.help-tabs .mud-tabs-panels {
+    padding: 20px 4px 4px;
+}
+
+/* ---------------------------------------------------------------- brand */
+
+.studio-logo {
+    /* The mark is 288x240; height drives it so the app bar row stays put. */
+    height: 28px;
+    width: auto;
+    display: block;
+}
+
+/* ---------------------------------------------------------------- home tiles */
+
+.home-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.home-mark {
+    height: 56px;
+    width: auto;
+    flex: none;
+}
+
+/* A tile is a real link or button, so it is focusable and can be opened in a new tab. */
+.tile-shell {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.tile-shell:focus-visible {
+    outline: 2px solid #56be74;
+    outline-offset: 3px;
+}
+
+.tile {
+    /* Square, whatever the column width works out to. */
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-align: center;
+    padding: 12px;
+    transition: border-color .15s ease, transform .15s ease, background-color .15s ease;
+}
+
+.tile:hover {
+    border-color: #3c5a46;
+    background-color: #1a1f26;
+    transform: translateY(-2px);
+}
+
+.tile-lead {
+    background: linear-gradient(160deg, rgba(86, 190, 116, .12), transparent 65%);
+}
+
+.tile-lead:hover {
+    border-color: #56be74;
+}
+
+.tile-lead .tile-icon {
+    color: #56be74;
+}
+
+.tile-lead:hover .tile-icon {
+    color: #7ad294;
+}
+
+.tile-icon {
+    display: block;
+    width: 46px;
+    height: 46px;
+    color: #9fb0c6;
+    transition: color .15s ease;
+}
+
+/* The icon is the thing the eye lands on, so it is what picks up the brand on hover. */
+.tile-shell:hover .tile-icon,
+.tile-shell:focus-visible .tile-icon {
+    color: #56be74;
+}
+
+.tile-title {
+    font-size: .95rem;
+    font-weight: 600;
+    letter-spacing: .01em;
+    color: #e2e6ec;
+    line-height: 1.2;
+}
+
+.tile-count {
+    font-size: .78rem;
+    color: #8a94a3;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Fixed-size squares that simply wrap - a launcher, not a 12-column layout. On a narrow
+   phone two still fit across. */
+.tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 158px));
+    gap: 16px;
+}
+
+/* Each tile is wrapped by its tooltip, so the wrapper is the grid item and has to pass
+   its width straight through or the square collapses. */
+.tile-grid > .mud-tooltip-root {
+    display: block;
+    width: 100%;
+}
+
+/* A table row that navigates should still offer a real link: keyboard focus, middle-click,
+   copy-link. The row click stays for the mouse. */
+.row-link {
+    color: inherit;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.row-link:hover {
+    color: #56be74;
+    text-decoration: underline;
+}
+
+.row-link:focus-visible {
+    outline: 2px solid #56be74;
+    outline-offset: 2px;
+    border-radius: 3px;
+}

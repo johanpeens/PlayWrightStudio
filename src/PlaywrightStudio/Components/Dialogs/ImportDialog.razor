@@ -1,0 +1,31 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
+            Paste a scenario json, or pick a .json file exported from another machine.
+        </MudText>
+        <label class="file-pick mb-2">
+            <InputFile OnChange="LoadFileAsync" accept=".json" />
+        </label>
+        <MudTextField @bind-Value="_json" Lines="14" Variant="Variant.Outlined" Class="mono"
+                      Placeholder='{ "name": "…", "steps": [ … ] }' />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@string.IsNullOrWhiteSpace(_json)"
+                   OnClick="@(() => MudDialog.Close(DialogResult.Ok(_json)))">Import</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _json = "";
+
+    private async Task LoadFileAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+        using var reader = new StreamReader(file.OpenReadStream(maxAllowedSize: 8 * 1024 * 1024));
+        _json = await reader.ReadToEndAsync();
+    }
+}

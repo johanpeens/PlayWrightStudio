@@ -1,0 +1,30 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <ResourcePreloader />
+    @* No web font: a render-blocking request to fonts.googleapis.com held first paint for
+       ~870ms on every load, and blocked entirely when offline. The system stack is local,
+       instant, and on Windows Segoe UI is what the rest of the OS uses anyway. *@
+    <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["PlaywrightStudio.styles.css"]" />
+    <ImportMap />
+    @* The svg is the real mark; the png stays as a fallback for anything that will not take one. *@
+    <link rel="icon" type="image/svg+xml" href="PlaywrightStudioLogo.svg" />
+    <link rel="alternate icon" type="image/png" href="favicon.png" />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <ReconnectModal />
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="@Assets["studio.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>

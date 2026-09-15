@@ -1,0 +1,180 @@
+﻿@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="5">
+                <MudSelect T="StepAction" @bind-Value="Step.Action" Label="Action" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Dense="true">
+                    @foreach (var action in Ordered)
+                    {
+                        <MudSelectItem T="StepAction" Value="@action">@action.Icon() @action</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="7">
+                <MudTextField @bind-Value="Step.Description" Label="Label (what this step means)"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            @if (Step.Action.NeedsSelector())
+            {
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Step.Selector" Label="Selector" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Class="mono"
+                                  HelperText="css, #id, [data-testid=…], text=Save or role=button[name=Save]" />
+                </MudItem>
+
+                @if (Step.SelectorAlternatives.Count > 0)
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Other selectors the recorder found:</MudText>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                            @foreach (var alt in Step.SelectorAlternatives)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="mono"
+                                         OnClick="@(() => UseAlternative(alt))">@alt</MudChip>
+                            }
+                        </div>
+                    </MudItem>
+                }
+
+                @if (Recorder is not null && Recorder.IsLive)
+                {
+                    <MudItem xs="12">
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined"
+                                   StartIcon="@Icons.Material.Filled.CenterFocusWeak" OnClick="TestAsync">
+                            Test against the live browser
+                        </MudButton>
+                        @if (_testResult is not null)
+                        {
+                            <MudText Typo="Typo.caption" Class="ml-2">@_testResult</MudText>
+                        }
+                    </MudItem>
+                }
+            }
+
+            @if (Step.Action.NeedsValue())
+            {
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Step.Value" Label="@ValueLabel" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Lines="@(Step.Action == StepAction.Comment ? 2 : 1)"
+                                  HelperText="@ValueHelp" />
+                </MudItem>
+            }
+
+            <MudItem xs="12">
+                <MudExpansionPanels Elevation="0" Dense="true">
+                <MudExpansionPanel Text="Advanced" Dense="true">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6" sm="4">
+                            <MudNumericField T="int?" @bind-Value="Step.TimeoutMs" Label="Timeout (ms)"
+                                             Variant="Variant.Outlined" Margin="Margin.Dense" Min="100" Clearable="true"
+                                             HelperText="blank = default" />
+                        </MudItem>
+                        <MudItem xs="6" sm="4">
+                            <MudNumericField T="int" @bind-Value="Step.DelayBeforeMs" Label="Wait before (ms)"
+                                             Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4" Class="d-flex align-center">
+                            <MudSwitch T="bool" @bind-Value="Step.Enabled" Color="Color.Primary" Label="Enabled" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSwitch T="bool" @bind-Value="Step.ContinueOnFailure" Color="Color.Warning"
+                                       Label="Carry on if this fails" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSwitch T="bool" @bind-Value="Step.CaptureScreenshot" Color="Color.Primary"
+                                       Label="Screenshot after this step" />
+                        </MudItem>
+                        @if (Step.FrameChain.Count > 0)
+                        {
+                            <MudItem xs="12">
+                                <MudTextField T="string" Value="@string.Join("  >>  ", Step.FrameChain)" ReadOnly="true"
+                                              Label="Inside iframe" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mono" />
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => MudDialog.Close(DialogResult.Ok(Step)))">
+            Done
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public TestStep Step { get; set; } = new();
+    [Parameter] public RecorderService? Recorder { get; set; }
+
+    private string? _testResult;
+
+    private static readonly StepAction[] Interactions =
+    {
+        StepAction.Navigate, StepAction.Click, StepAction.DoubleClick, StepAction.RightClick,
+        StepAction.Fill, StepAction.Type, StepAction.Press, StepAction.Select,
+        StepAction.Check, StepAction.Uncheck, StepAction.Hover, StepAction.Upload,
+        StepAction.Focus, StepAction.ScrollIntoView
+    };
+
+    private static readonly StepAction[] Waits =
+    {
+        StepAction.WaitForSelector, StepAction.WaitForHidden, StepAction.WaitForUrl, StepAction.WaitForTimeout
+    };
+
+    private static readonly StepAction[] Checks =
+    {
+        StepAction.AssertVisible, StepAction.AssertHidden, StepAction.AssertText, StepAction.AssertValue,
+        StepAction.AssertChecked, StepAction.AssertUrl, StepAction.AssertTitle, StepAction.AssertCount
+    };
+
+    private static readonly StepAction[] Other = { StepAction.Screenshot, StepAction.Comment };
+
+    private static IEnumerable<StepAction> Ordered =>
+        Interactions.Concat(Waits).Concat(Checks).Concat(Other);
+
+    private string ValueLabel => Step.Action switch
+    {
+        StepAction.Navigate or StepAction.WaitForUrl or StepAction.AssertUrl => "Url",
+        StepAction.Press => "Key",
+        StepAction.Select => "Option value(s), comma separated",
+        StepAction.Upload => "Full file path(s), semicolon separated",
+        StepAction.WaitForTimeout => "Milliseconds",
+        StepAction.AssertChecked => "true or false",
+        StepAction.AssertCount => "Expected number of matches",
+        StepAction.Comment => "Note",
+        _ when Step.Action.IsAssertion() => "Expected",
+        _ => "Value"
+    };
+
+    private string ValueHelp => Step.Action switch
+    {
+        StepAction.Press => "Enter, Tab, Escape, Control+a …",
+        StepAction.AssertText or StepAction.AssertValue or StepAction.AssertUrl or StepAction.AssertTitle
+            => "contains by default · =exact · /regex/",
+        StepAction.Fill or StepAction.Type => "{{variables}} are expanded at run time",
+        _ => ""
+    };
+
+    private void UseAlternative(string alt)
+    {
+        var previous = Step.Selector;
+        Step.Selector = alt;
+        var list = Step.SelectorAlternatives.Where(a => a != alt).ToList();
+        if (!string.IsNullOrWhiteSpace(previous) && !list.Contains(previous)) list.Insert(0, previous);
+        Step.SelectorAlternatives = list;
+    }
+
+    private async Task TestAsync()
+    {
+        if (Recorder is null) return;
+        _testResult = await Recorder.TrySelectorAsync(Step.Selector ?? "", Step.FrameChain);
+    }
+}
