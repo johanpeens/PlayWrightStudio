@@ -1,0 +1,612 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where a Click Goes</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  /* Same token set as architecture.html so the docs read as one family. The three nesting
+     levels each need their own fill, because a box title has to sit on its PARENT's fill to
+     break that box's border cleanly. */
+  :root {
+    --ground:   #f7f8f6;
+    --l1:       #ffffff;
+    --l2:       #f2f5f2;
+    --l3:       #e8eee9;
+    --ink:      #14181a;
+    --ink-soft: #57625c;
+    --ink-faint:#8a938d;
+    --rule:     #dfe5e0;
+    --rule-2:   #cfd8d1;
+    --accent:   #2f7d4f;
+    --wire:     #2f7d4f;
+    --wire-2:   #3a6ea8;
+    --code-bg:  #e9eeea;
+
+    --sans:    "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --display: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+    --mono:    "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0f1115;
+      --l1:       #171a20;
+      --l2:       #1d2129;
+      --l3:       #232833;
+      --ink:      #e8eaed;
+      --ink-soft: #98a1ad;
+      --ink-faint:#78818e;
+      --rule:     #2b313a;
+      --rule-2:   #3a424e;
+      --accent:   #56be74;
+      --wire:     #56be74;
+      --wire-2:   #6fa4dd;
+      --code-bg:  #12161c;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #0f1115;
+    --l1:       #171a20;
+    --l2:       #1d2129;
+    --l3:       #232833;
+    --ink:      #e8eaed;
+    --ink-soft: #98a1ad;
+    --ink-faint:#78818e;
+    --rule:     #2b313a;
+    --rule-2:   #3a424e;
+    --accent:   #56be74;
+    --wire:     #56be74;
+    --wire-2:   #6fa4dd;
+    --code-bg:  #12161c;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding-block: 56px 88px;
+    padding-left: 20px;
+    padding-right: 20px;
+    background: var(--ground);
+    color: var(--ink);
+    font: 400 16px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 720px; margin: 0 auto; }
+
+  /* ------------------------------------------------------------- masthead */
+
+  .eyebrow {
+    font: 500 11px/1 var(--mono);
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 12px;
+  }
+
+  h1 {
+    font: 700 clamp(30px, 5.5vw, 44px)/1.05 var(--display);
+    letter-spacing: -.025em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: 17.5px;
+    color: var(--ink-soft);
+    margin: 0 0 44px;
+  }
+
+  /* ------------------------------------------------------------- boxes */
+
+  .box {
+    position: relative;
+    border: 1px solid var(--rule-2);
+    border-radius: 10px;
+    padding: 22px 18px 18px;
+  }
+
+  /* The title sits on the border line, so its background must match whatever is
+     immediately outside this box - hence one rule per nesting level. */
+  .box > .title {
+    position: absolute;
+    top: -9px;
+    left: 16px;
+    padding: 0 9px;
+    font: 500 10.5px/1 var(--mono);
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    max-width: calc(100% - 32px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .box > .title em {
+    font-style: normal;
+    letter-spacing: .08em;
+    color: var(--ink-faint);
+    text-transform: none;
+  }
+
+  .lvl1 { background: var(--l1); }
+  .lvl2 { background: var(--l2); margin-top: 18px; }
+  .lvl3 { background: var(--l3); margin-top: 18px; }
+
+  .lvl1 > .title { background: var(--ground); color: var(--ink); }
+  .lvl2 > .title { background: var(--l1); }
+  .lvl3 > .title { background: var(--l2); }
+
+  /* A nested box inside a nested box needs its title on the level above it. */
+  .lvl2 .lvl3 > .title { background: var(--l2); }
+
+  .box p {
+    margin: 0;
+    font-size: 15px;
+    color: var(--ink-soft);
+  }
+
+  .box p + p { margin-top: 6px; }
+
+  .box ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .box li {
+    font-size: 15px;
+    color: var(--ink-soft);
+    padding-left: 16px;
+    position: relative;
+  }
+
+  .box li + li { margin-top: 4px; }
+
+  .box li::before {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: .62em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--rule-2);
+  }
+
+  code {
+    font: 400 .88em/1.4 var(--mono);
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+
+  .arrives {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* ------------------------------------------------------------- step list */
+
+  .steps {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 3px 14px;
+    font: 400 14px/1.5 var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+  }
+
+  .steps .n { color: var(--ink-faint); }
+  .steps .act { color: var(--ink); }
+
+  .saved {
+    font: 500 10.5px/1 var(--mono);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 10px;
+  }
+
+  /* ------------------------------------------------------------- wires */
+
+  .wire {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    align-items: center;
+    gap: 0 16px;
+    padding: 4px 0;
+    margin-left: 22px;
+  }
+
+  .wire .line {
+    justify-self: center;
+    width: 2px;
+    height: 74px;
+    background: var(--w);
+    position: relative;
+    border-radius: 1px;
+  }
+
+  .wire .line::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -1px;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid var(--w);
+  }
+
+  .wire .label { padding: 4px 0; }
+
+  .wire .name {
+    font: 500 13px/1.4 var(--mono);
+    color: var(--w);
+  }
+
+  .wire .detail {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--ink-faint);
+  }
+
+  .wire.playwright { --w: var(--wire); }
+  .wire.signalr    { --w: var(--wire-2); }
+
+  /* ------------------------------------------------------------- ladder */
+
+  .ladder-block {
+    margin-top: 52px;
+    border-top: 1px solid var(--rule);
+    padding-top: 26px;
+  }
+
+  h2 {
+    font: 700 22px/1.2 var(--display);
+    letter-spacing: -.015em;
+    margin: 0 0 8px;
+  }
+
+  .ladder-block > p {
+    margin: 0 0 22px;
+    font-size: 15.5px;
+    color: var(--ink-soft);
+    max-width: 58ch;
+  }
+
+  .ladder {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ladder li {
+    position: relative;
+    padding: 7px 0 7px 22px;
+    margin-left: calc(var(--d) * 26px);
+    font-size: 15px;
+  }
+
+  /* The elbow that makes the nesting legible, same shape as the box drawing. */
+  .ladder li::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 0;
+    bottom: 50%;
+    width: 11px;
+    border-left: 2px solid var(--rule-2);
+    border-bottom: 2px solid var(--rule-2);
+    border-bottom-left-radius: 5px;
+  }
+
+  .ladder li:first-child { padding-left: 0; }
+  .ladder li:first-child::before { display: none; }
+
+  .ladder b {
+    font: 500 14.5px/1.5 var(--mono);
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .ladder span {
+    display: block;
+    font-size: 13.5px;
+    color: var(--ink-faint);
+    margin-top: 1px;
+  }
+
+  .ladder li.deep b { color: var(--accent); }
+
+  /* ------------------------------------------------------------- plain text */
+
+  .plain-block { margin-top: 52px; border-top: 1px solid var(--rule); padding-top: 26px; }
+
+  .ascii-wrap { position: relative; }
+
+  pre.ascii {
+    margin: 0;
+    background: var(--l2);
+    border: 1px solid var(--rule-2);
+    border-radius: 10px;
+    padding: 20px 18px;
+    overflow-x: auto;
+    font: 400 12.5px/1.45 var(--mono);
+    color: var(--ink-soft);
+    tab-size: 4;
+  }
+
+  pre.ascii + pre.ascii { margin-top: 16px; }
+
+  .copy {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border: 1px solid var(--rule-2);
+    background: var(--l1);
+    color: var(--ink-soft);
+    border-radius: 6px;
+    padding: 5px 11px;
+    font: 500 11px/1 var(--mono);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .copy:hover { color: var(--accent); border-color: var(--accent); }
+
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ------------------------------------------------------------- legend */
+
+  .legend {
+    margin-top: 48px;
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+    display: grid;
+    gap: 14px;
+  }
+
+  .legend div {
+    font-size: 14.5px;
+    color: var(--ink-soft);
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .legend div::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .55em;
+    width: 10px;
+    height: 3px;
+    border-radius: 2px;
+  }
+
+  .legend .a::before { background: var(--wire); }
+  .legend .b::before { background: var(--wire-2); }
+
+  .legend b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 560px) {
+    .box { padding: 20px 12px 14px; }
+    .wire { margin-left: 8px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Playwright Studio</p>
+  <h1>Where a Click Goes</h1>
+  <p class="standfirst">
+    One click in the recorded browser, travelling all the way to the list on your screen. Two
+    separate connections do the carrying, and nothing touches the disk on the way.
+  </p>
+
+  <!-- ------------------------------------------------------ the recorded browser -->
+  <div class="box lvl1">
+    <span class="title">Playwright's browser <em>— the one that pops up</em></span>
+
+    <div class="box lvl2">
+      <span class="title">the page you are testing</span>
+      <p>Your signup form, an OAuth login, whatever you opened.</p>
+
+      <div class="box lvl3">
+        <span class="title">recorder.js <em>— injected into the page</em></span>
+        <ul>
+          <li>watches every click and keystroke</li>
+          <li>works out how to describe the element</li>
+          <li>calls <code>__pwsEmit("{ … }")</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="wire playwright">
+    <div class="line"></div>
+    <div class="label">
+      <div class="name">__pwsEmit</div>
+      <div class="detail">
+        one JSON string per click<br>
+        page → chromium → node.exe → .NET
+      </div>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------ the app -->
+  <div class="box lvl1">
+    <span class="title">The app <em>— PlaywrightStudio.exe</em></span>
+
+    <div class="box lvl2">
+      <span class="title">RecorderService</span>
+      <p><code>OnRecorderMessage(json)</code> <span class="arrives">← arrives here</span></p>
+
+      <div class="box lvl3">
+        <span class="title">Steps <em>— RAM only, until you stop</em></span>
+        <div class="steps">
+          <span class="n">1</span><span class="act">Navigate</span><span>/signup</span>
+          <span class="n">2</span><span class="act">Fill</span><span>email</span>
+          <span class="n">3</span><span class="act">Click</span><span>Save</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="box lvl2">
+      <span class="title">Blazor circuit</span>
+      <p>Re-renders the tab you have open.</p>
+    </div>
+  </div>
+
+  <div class="wire signalr">
+    <div class="line"></div>
+    <div class="label">
+      <div class="name">SignalR</div>
+      <div class="detail">
+        Blazor's own connection<br>
+        app → the tab you have open
+      </div>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------ your browser -->
+  <div class="box lvl1">
+    <span class="title">Your browser <em>— localhost:5050</em></span>
+
+    <div class="box lvl2">
+      <span class="title">Studio UI</span>
+      <p class="saved">Steps · 3 saved</p>
+      <div class="steps">
+        <span class="n">1</span><span class="act">Navigate</span><span>/signup</span>
+        <span class="n">2</span><span class="act">Fill</span><span>email</span>
+        <span class="n">3</span><span class="act">Click</span><span>Save</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="ladder-block">
+    <h2>Four processes deep</h2>
+    <p>
+      That first hop looks like one arrow, but the click has to climb out through four separate
+      programs before any C# of yours runs. Every rung is a real thing in your build output.
+    </p>
+
+    <ol class="ladder">
+      <li style="--d:0"><b>your C# code</b></li>
+      <li style="--d:1"><b>Microsoft.Playwright.dll</b><span>in your process · 1 MB · the API you call</span></li>
+      <li style="--d:2"><b>node.exe</b><span>separate process, spawned by your app · 92 MB</span></li>
+      <li style="--d:3"><b>Chromium</b><span>separate process, spawned by node</span></li>
+      <li style="--d:4" class="deep"><b>the page</b><span>where recorder.js and __pwsEmit live</span></li>
+    </ol>
+  </section>
+
+  <section class="plain-block">
+    <h2>The same thing, in plain text</h2>
+    <p>
+      For pasting into a code comment, a README or a chat window, where the version above cannot go.
+    </p>
+
+    <div class="ascii-wrap">
+      <button class="copy" type="button" data-copy="boxes">Copy</button>
+      <pre class="ascii" id="boxes">┌─ PLAYWRIGHT'S BROWSER    the one that pops up ───────────┐
+│                                                          │
+│  ┌─ the page you are testing ───────────────────────────┐│
+│  │  your signup form, an OAuth login,                   ││
+│  │  whatever you opened                                 ││
+│  │                                                      ││
+│  │  ┌─ recorder.js   injected into the page ───────────┐││
+│  │  │  watches every click and keystroke               │││
+│  │  │  works out how to describe the element           │││
+│  │  │  calls  __pwsEmit("{ ... }")                     │││
+│  │  └──────────────────────────────────────────────────┘││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+                    │
+                    │   __pwsEmit    one JSON string per click
+                    │   page -&gt; chromium -&gt; node.exe -&gt; .NET
+                    ▼
+┌─ THE APP     PlaywrightStudio.exe ───────────────────────┐
+│                                                          │
+│  ┌─ RecorderService ────────────────────────────────────┐│
+│  │  OnRecorderMessage(json)   &lt;- arrives here           ││
+│  │                                                      ││
+│  │  ┌─ Steps   RAM only, until you stop ───────────────┐││
+│  │  │  1  Navigate   /signup                           │││
+│  │  │  2  Fill       email                             │││
+│  │  │  3  Click      Save                              │││
+│  │  └──────────────────────────────────────────────────┘││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌─ Blazor circuit ─────────────────────────────────────┐│
+│  │  re-renders the tab you have open                    ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+                    │
+                    │   SignalR    Blazor's own connection
+                    │   app -&gt; the tab you have open
+                    ▼
+┌─ YOUR BROWSER     localhost:5050 ────────────────────────┐
+│                                                          │
+│  ┌─ Studio UI ──────────────────────────────────────────┐│
+│  │  Steps   3 saved                                     ││
+│  │  1  Navigate   /signup                               ││
+│  │  2  Fill       email                                 ││
+│  │  3  Click      Save                                  ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+└──────────────────────────────────────────────────────────┘</pre>
+    </div>
+
+    <div class="ascii-wrap" style="margin-top:16px">
+      <button class="copy" type="button" data-copy="ladder">Copy</button>
+      <pre class="ascii" id="ladder">your C# code
+  └─ Microsoft.Playwright.dll     in your process
+       └─ node.exe                separate process, spawned by your app
+            └─ Chromium           separate process, spawned by node
+                 └─ the page      where recorder.js and __pwsEmit live</pre>
+    </div>
+  </section>
+
+  <div class="legend">
+    <div class="a">
+      <b>Playwright's pipe</b> — four processes deep, which is why a plain function call cannot
+      do it and a binding has to exist.
+    </div>
+    <div class="b">
+      <b>Blazor's pipe</b> — ordinary Blazor Server. Nothing to do with Playwright; it is only
+      keeping the page you are looking at up to date.
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pre = document.getElementById(btn.dataset.copy);
+      navigator.clipboard.writeText(pre.textContent).then(function () {
+        var was = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = was; }, 1400);
+      }).catch(function () {
+        btn.textContent = 'Select it';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 1400);
+      });
+    });
+  });
+</script>

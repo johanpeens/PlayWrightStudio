@@ -1,0 +1,838 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Playwright Studio Works</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+  /* Tokens follow user-guide.html so the two documents sit together, with the accent moved
+     from that guide's blue to the studio's own leaf green. */
+  :root {
+    --ground:      #f7f8f6;
+    --surface:     #ffffff;
+    --surface-2:   #eef1ee;
+    --ink:         #14181a;
+    --ink-soft:    #57625c;
+    --ink-faint:   #8a938d;
+    --rule:        #e2e7e3;
+    --rule-strong: #cdd5cf;
+    --accent:      #2f7d4f;
+    --accent-wash: #e6f2ea;
+    --rec:         #c4384f;
+    --rec-wash:    #fbecee;
+    --amber:       #8a6100;
+    --amber-wash:  #fdf2dc;
+    --code-bg:     #eef1ee;
+    --diagram-bg:  #ffffff;
+    --shadow:      0 1px 2px rgba(20,40,30,.05), 0 8px 24px rgba(20,40,30,.06);
+
+    --sans:    "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --display: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+    --mono:    "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  }
+
+  /* System-dark, which is what most viewers actually get - no stamp on the root element. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0f1115;
+      --surface:     #171a20;
+      --surface-2:   #1d222a;
+      --ink:         #e8eaed;
+      --ink-soft:    #98a1ad;
+      --ink-faint:   #78818e;
+      --rule:        #262b33;
+      --rule-strong: #333a44;
+      --accent:      #56be74;
+      --accent-wash: #16241b;
+      --rec:         #ff6b81;
+      --rec-wash:    #2a1b20;
+      --amber:       #ffc857;
+      --amber-wash:  #2a2213;
+      --code-bg:     #12161c;
+      --diagram-bg:  #14181e;
+      --shadow:      0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.28);
+    }
+  }
+
+  /* An explicit dark choice wins over a light OS. */
+  :root[data-theme="dark"] {
+    --ground:      #0f1115;
+    --surface:     #171a20;
+    --surface-2:   #1d222a;
+    --ink:         #e8eaed;
+    --ink-soft:    #98a1ad;
+    --ink-faint:   #78818e;
+    --rule:        #262b33;
+    --rule-strong: #333a44;
+    --accent:      #56be74;
+    --accent-wash: #16241b;
+    --rec:         #ff6b81;
+    --rec-wash:    #2a1b20;
+    --amber:       #ffc857;
+    --amber-wash:  #2a2213;
+    --code-bg:     #12161c;
+    --diagram-bg:  #14181e;
+    --shadow:      0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.28);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding-block: 0 96px;
+    padding-left: 24px;
+    padding-right: 24px;
+    background: var(--ground);
+    color: var(--ink);
+    font: 400 16.5px/1.65 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+
+  /* Prose keeps a readable measure; diagrams break out to the full band. */
+  .prose { max-width: 68ch; }
+
+  /* ---------------------------------------------------------------- masthead */
+
+  header.masthead {
+    padding-block: 72px 40px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 56px;
+  }
+
+  .eyebrow {
+    font: 500 11px/1 var(--mono);
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 14px;
+  }
+
+  h1 {
+    font: 700 clamp(34px, 6vw, 56px)/1.04 var(--display);
+    letter-spacing: -.025em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: 19px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 60ch;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .fact {
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    border-radius: 7px;
+    padding: 9px 13px;
+    font: 400 12.5px/1.3 var(--mono);
+    color: var(--ink-soft);
+  }
+
+  .fact b {
+    display: block;
+    font: 500 10px/1 var(--mono);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 5px;
+  }
+
+  /* ---------------------------------------------------------------- sections */
+
+  section { margin-bottom: 72px; }
+
+  h2 {
+    font: 700 clamp(24px, 3.4vw, 32px)/1.15 var(--display);
+    letter-spacing: -.018em;
+    margin: 0 0 8px;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font: 600 18px/1.3 var(--sans);
+    margin: 36px 0 8px;
+  }
+
+  .lede {
+    font-size: 17.5px;
+    color: var(--ink-soft);
+    margin: 0 0 22px;
+    max-width: 62ch;
+  }
+
+  p { margin: 0 0 16px; }
+  .prose > p:last-child { margin-bottom: 0; }
+
+  a {
+    color: var(--accent);
+    text-underline-offset: 2px;
+  }
+
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  code {
+    font: 400 .86em/1.4 var(--mono);
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1px 5px;
+    overflow-wrap: anywhere;
+  }
+
+  strong { font-weight: 600; }
+
+  /* ---------------------------------------------------------------- diagrams */
+
+  figure {
+    margin: 28px 0 8px;
+  }
+
+  .diagram {
+    background: var(--diagram-bg);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 26px 20px;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+
+  pre.mermaid {
+    margin: 0;
+    text-align: center;
+    min-height: 40px;
+    font: 400 13px/1.5 var(--mono);
+    color: var(--ink-faint);
+  }
+
+  /* Until mermaid has run, the source would flash as raw text. */
+  pre.mermaid:not([data-processed]) { visibility: hidden; }
+
+  .lanes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    gap: 16px;
+  }
+
+  .lane-label {
+    margin: 0 0 14px;
+    font: 500 10.5px/1 var(--mono);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  figcaption {
+    margin-top: 12px;
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 72ch;
+  }
+
+  .fallback {
+    display: none;
+    border: 1px dashed var(--rule-strong);
+    border-radius: 8px;
+    padding: 14px 16px;
+    color: var(--ink-soft);
+    font-size: 14.5px;
+  }
+
+  :root.no-mermaid .fallback { display: block; }
+  :root.no-mermaid .diagram { display: none; }
+
+  /* ---------------------------------------------------------------- callouts */
+
+  .note {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin: 24px 0;
+    max-width: 72ch;
+  }
+
+  .note.warn { border-left-color: var(--amber); }
+  .note.rec  { border-left-color: var(--rec); }
+
+  .note .tag {
+    display: inline-block;
+    font: 500 10px/1 var(--mono);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 8px;
+  }
+
+  .note p { margin: 0; font-size: 15.5px; }
+  .note p + p { margin-top: 10px; }
+
+  /* ---------------------------------------------------------------- table */
+
+  .scroller { overflow-x: auto; margin: 24px 0; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 520px;
+    font-size: 15px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  th {
+    font: 500 10.5px/1 var(--mono);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom-color: var(--rule-strong);
+    white-space: nowrap;
+  }
+
+  td.rank {
+    font: 500 13px/1.5 var(--mono);
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    width: 3rem;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* ---------------------------------------------------------------- footer */
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 24px;
+    color: var(--ink-faint);
+    font-size: 14px;
+    max-width: 68ch;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Playwright Studio · architecture</p>
+    <h1>How Playwright Studio Works</h1>
+    <p class="standfirst">
+      A local Blazor app that watches you use a website once, writes down what you did, and can do
+      it again on demand. The whole design turns on one idea: the browser is never handed a script
+      to perform — during recording it is handed a pair of eyes.
+    </p>
+
+    <div class="facts">
+      <div class="fact"><b>Runs at</b>localhost:5050</div>
+      <div class="fact"><b>Stack</b>Blazor Server · MudBlazor · Playwright</div>
+      <div class="fact"><b>Injected script</b>Assets/recorder.js</div>
+      <div class="fact"><b>Data</b>%LOCALAPPDATA%</div>
+    </div>
+  </header>
+
+  <!-- ------------------------------------------------------------ direction -->
+  <section>
+    <div class="prose">
+      <p class="eyebrow">The central idea</p>
+      <h2>Steps come out, not in</h2>
+      <p class="lede">
+        The easiest thing to get backwards. Recording and replay run in opposite directions, and
+        only one of them puts anything inside the page.
+      </p>
+      <p>
+        While you record, a small script sits inside the web page taking minutes. You drive; it
+        writes down <em>clicked the button labelled Save</em>, <em>typed jane@acme.com into
+        Email</em>. Those notes travel back into the .NET app through a function called
+        <code>__pwsEmit</code> and become the step list on screen.
+      </p>
+      <p>
+        Replay does none of that. Playwright works the browser from the outside, like a remote
+        control, reading your step list and finding each element itself.
+      </p>
+    </div>
+
+    <!-- Two separate diagrams laid out by CSS: one flowchart holding both lanes is either
+         far too wide side by side, or loses its left-to-right flow once stacked. -->
+    <figure>
+      <div class="lanes">
+        <div class="diagram">
+          <p class="lane-label">Recording — you drive</p>
+<pre class="mermaid">
+flowchart TB
+  A["You click and type"] --> B["recorder.js<br/>watching inside the page"]
+  B -->|"__pwsEmit"| C["Studio<br/>step list grows"]
+</pre>
+        </div>
+        <div class="diagram">
+          <p class="lane-label">Replay — the app drives</p>
+<pre class="mermaid">
+flowchart TB
+  D["Studio<br/>reads the step list"] -->|"Playwright"| E["Browser<br/>driven from outside"]
+  E --> F["Run report<br/>status · timing · shots"]
+</pre>
+        </div>
+      </div>
+      <figcaption>
+        Nothing is injected to make replay click things. The only thing put into the page during a
+        run is the progress bar with the Stop button — something to look at, not the thing doing
+        the work.
+      </figcaption>
+    </figure>
+    <div class="fallback prose">
+      Diagrams need the mermaid library, which is loaded from a CDN. This page is offline or the
+      request was blocked, so the diagrams are hidden.
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ injection -->
+  <section>
+    <div class="prose">
+      <p class="eyebrow">Recording</p>
+      <h2>A watcher in every room</h2>
+      <p class="lede">
+        A website is not one room. Every page is a new room, and every iframe — a payment widget, a
+        cookie banner, a sign-in box — is a sealed room of its own.
+      </p>
+      <p>
+        A watcher planted in one room cannot see into the others, and is thrown out the moment you
+        navigate. So the studio does not plant it per page. It tells the whole browser session:
+        <strong>put one of these in every room, including rooms that do not exist yet.</strong>
+        That instruction is <code>AddInitScriptAsync</code>, called once on the browser context
+        rather than on a page.
+      </p>
+      <p>
+        The payoff is the awkward case. You click <em>Sign in</em>, get bounced to Microsoft, sign
+        in, and land back on the app. Four documents, three of them not yours. The watcher is
+        already waiting in each one, in place before the page's own code starts running.
+      </p>
+    </div>
+
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  CTX["BrowserContext<br/><b>AddInitScriptAsync(recorder.js)</b><br/>ExposeBindingAsync(__pwsEmit)"]
+
+  CTX --> P1["Page · your signup form"]
+  CTX --> P2["Page · login.microsoftonline.com"]
+  CTX --> P3["Page · tab opened mid-journey"]
+
+  P1 --> F1["iframe · payment widget"]
+  P1 --> F2["iframe · cookie banner"]
+  P2 --> F3["iframe · consent prompt"]
+
+  P3 -.->|"every new document<br/>gets its own copy"| CTX
+</pre>
+      </div>
+      <figcaption>
+        One call covers every page and every frame, now and later. Injecting per page instead would
+        mean re-planting the watcher after each navigation — and losing whatever you did in the
+        first half-second.
+      </figcaption>
+    </figure>
+
+    <div class="note prose">
+      <span class="tag">Evidence, not assertion</span>
+      <p>
+        Two bugs in this app only make sense because the script really does run in every frame. A
+        cross-origin iframe once produced <code>Locator("iframe") resolved to 6 elements</code> —
+        the watcher was inside a frame, naming its own container. And a stray
+        <code>about:srcdoc</code> navigation step appeared because the navigation check was firing
+        in <em>every</em> frame rather than the top one.
+      </p>
+    </div>
+
+    <div class="note rec prose">
+      <span class="tag">Why the toolbar is invisible to itself</span>
+      <p>
+        Because the watcher lives inside your page, its own REC toolbar would be written down as
+        steps and would inherit your site's CSS. So the toolbar is built in a shadow root — a
+        sealed bubble the page cannot style and the recorder deliberately ignores.
+      </p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ selectors -->
+  <section>
+    <div class="prose">
+      <p class="eyebrow">Recording</p>
+      <h2>Choosing how to describe a button</h2>
+      <p class="lede">
+        A step has to survive the page changing. That makes "which of the many true descriptions of
+        this element do we write down?" the hardest question in the app.
+      </p>
+      <p>
+        For every element you touch, the recorder generates a list of candidate descriptions, then
+        throws away any that match more than one thing on the page. What survives is kept in
+        order — the best becomes the step's selector, and the rest are stored as fallbacks the
+        runner can try later.
+      </p>
+    </div>
+
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  EL["The element you clicked"] --> GEN["Generate every candidate<br/>description of it"]
+
+  GEN --> T1["data-testid=save"]
+  GEN --> T2["#email"]
+  GEN --> T3["input name=plan"]
+  GEN --> T4["role=button name=Save"]
+  GEN --> T5["#mudinput08267ls7"]
+  GEN --> T6["form > div:nth-child(3) > input"]
+
+  T1 --> Q{"Matches exactly<br/>one element?"}
+  T2 --> Q
+  T3 --> Q
+  T4 --> Q
+  T5 --> Q
+  T6 --> Q
+
+  Q -->|"no"| DROP["Discarded"]
+  Q -->|"yes"| KEEP["Kept, best first"]
+  KEEP --> STEP["Step stores<br/>1 primary + the alternatives"]
+</pre>
+      </div>
+      <figcaption>
+        Keeping the rejects is what makes a broken step repairable later: when the primary stops
+        matching, the runner walks the alternatives before giving up.
+      </figcaption>
+    </figure>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Rank</th><th>Looks like</th><th>Why there</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="rank">1</td><td><code>[data-testid="save"]</code></td><td>Put there to be tested against. Always wins.</td></tr>
+          <tr><td class="rank">2</td><td><code>#email</code></td><td>An id a person chose, not one a framework generated.</td></tr>
+          <tr><td class="rank">3</td><td><code>input[name="plan"]</code></td><td>Form attributes — also aria-label and placeholder.</td></tr>
+          <tr><td class="rank">4</td><td><code>role=button[name="Save"]</code></td><td>What the user sees. Survives a redesign.</td></tr>
+          <tr><td class="rank">5</td><td><code>#mudinput08267ls7</code></td><td>A generated id. Works today, gone next render.</td></tr>
+          <tr><td class="rank">6</td><td><code>form &gt; div:nth-child(3)</code></td><td>A path through the markup. Last resort.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note warn prose">
+      <span class="tag">The counter-intuitive rank</span>
+      <p>
+        Machine-generated ids sit <em>below</em> role and text on purpose. <code>#mudinput08267ls7</code>
+        is unique, precise, and worthless — it changes the next time the component renders. A button
+        described as "the one labelled Save" outlives a rebuild; one described by a generated id
+        does not.
+      </p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ replay -->
+  <section>
+    <div class="prose">
+      <p class="eyebrow">Replay</p>
+      <h2>Finding it again, and saying why not</h2>
+      <p class="lede">
+        The page you replay against is never quite the page you recorded. Most of the runner is
+        about closing that gap, and explaining itself when it cannot.
+      </p>
+      <p>
+        A bare <em>Timeout 10000ms exceeded</em> tells you nothing you can act on. So when a step
+        fails, the runner goes back and asks the page what was actually true — and reports which of
+        four situations it hit.
+      </p>
+    </div>
+
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  S["Step runs"] --> TRY["Try the primary selector"]
+  TRY --> Q1{"Anything matched?"}
+
+  Q1 -->|"yes"| VIS["Act on the first<br/><b>visible</b> match"]
+  Q1 -->|"no"| ALT["Try the stored alternatives"]
+
+  ALT --> Q2{"Any of them match?"}
+  Q2 -->|"yes"| VIS
+  Q2 -->|"no"| DIAG["Diagnose, do not just time out"]
+
+  VIS --> OK["Passed · timing · screenshot"]
+
+  DIAG --> R1["Nothing matched at all"]
+  DIAG --> R2["Matched, but nothing visible"]
+  DIAG --> R3["Something covered the click<br/><i>named in the message</i>"]
+  DIAG --> R4["The iframe never appeared"]
+</pre>
+      </div>
+      <figcaption>
+        Acting on the first <em>visible</em> match rather than the first in the markup fixes a whole
+        class of intermittent timeouts, where a hidden duplicate earlier in the page was winning.
+      </figcaption>
+    </figure>
+
+    <div class="prose">
+      <p>
+        The runner also follows tabs the journey opens, accepts browser confirm dialogs, and falls
+        back from a dropdown option's value to its visible label.
+      </p>
+    </div>
+
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  actor You
+  participant Studio as Studio (Blazor)
+  participant PW as Playwright
+  participant Web as The website
+
+  You->>Studio: Press Run
+  Studio->>PW: Launch a browser, or attach to yours
+  PW->>Web: Open a page at the start url
+
+  loop every enabled step
+    Studio->>PW: Resolve this selector
+    PW->>Web: Click / fill / assert
+    Web-->>PW: Result
+    PW-->>Studio: Passed or failed, with timing
+    Studio-->>You: Row turns green, live
+  end
+
+  Studio->>Studio: Write run.json, screenshots, trace
+  Studio-->>You: Run report
+</pre>
+      </div>
+      <figcaption>
+        Results stream back row by row while the run is going, which is why the step list fills in
+        green in front of you rather than all at once at the end.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ------------------------------------------------------------ pieces -->
+  <section>
+    <div class="prose">
+      <p class="eyebrow">The parts</p>
+      <h2>What talks to what</h2>
+      <p class="lede">
+        One process. The user interface is a web page served by the same app that drives the
+        browsers, and everything it remembers is plain files on your disk.
+      </p>
+    </div>
+
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  subgraph UI ["Your browser · localhost:5050"]
+    BLZ["Blazor Server UI<br/>MudBlazor components"]
+  end
+
+  subgraph APP ["PlaywrightStudio process"]
+    REC["RecorderService<br/>owns the recording session"]
+    RUN["RunnerService<br/>executes steps, diagnoses failures"]
+    HOST["PlaywrightHost<br/>launches or attaches browsers"]
+    MAN["ManualService<br/>drafts and prints manuals"]
+    ST["Stores<br/>Scenario · Run · Manual"]
+  end
+
+  subgraph BR ["Browsers Playwright drives"]
+    TGT["The site under test"]
+  end
+
+  subgraph DISK ["%LOCALAPPDATA%/PlaywrightStudio"]
+    F1["scenarios/*.json"]
+    F2["runs/timestamp/"]
+    F3["manuals/id/"]
+    F4["settings.json"]
+  end
+
+  BLZ <--> REC
+  BLZ <--> RUN
+  BLZ <--> MAN
+  REC --> HOST
+  RUN --> HOST
+  HOST --> TGT
+  REC --> ST
+  RUN --> ST
+  MAN --> ST
+  ST --> F1
+  ST --> F2
+  ST --> F3
+  ST --> F4
+</pre>
+      </div>
+      <figcaption>
+        Scenarios are readable JSON, one file each, which is why committing them next to the app
+        they test works well. Run videos and page captures are the exception — they land beside the
+        executable rather than in the data folder.
+      </figcaption>
+    </figure>
+
+    <div class="note prose">
+      <span class="tag">One more output</span>
+      <p>
+        Because every step already carries a screenshot and a written description, the same
+        recording drafts a <strong>user manual</strong> — numbered instructions with pictures,
+        editable, printable to PDF. Nothing extra is captured for it; it is the run report read
+        for a different audience.
+      </p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ in short -->
+  <section>
+    <div class="prose">
+      <p class="eyebrow">In short</p>
+      <h2>The whole thing, once through</h2>
+      <p class="lede">
+        Everything above, with the plumbing left out.
+      </p>
+    </div>
+
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  actor You
+  participant Studio
+  participant Browser
+
+  You->>Studio: Click Record
+  Studio->>Browser: Open a window at your url
+
+  You->>Browser: Click Save
+  Browser->>Studio: "clicked the button labelled Save"
+  You->>Browser: Type an email address
+  Browser->>Studio: "typed jane@acme.com into Email"
+
+  You->>Browser: Close the window
+  Browser->>Studio: Done
+  Studio-->>You: 7 steps, ready to replay
+</pre>
+      </div>
+      <figcaption>
+        You talk to the browser. The browser talks to the studio. The studio never tells the browser
+        what to click — not while you are recording.
+      </figcaption>
+    </figure>
+  </section>
+
+  <footer>
+    Companion to <a href="user-guide.html">the user guide</a>, which covers using the studio rather
+    than how it is built. Diagrams render with mermaid, loaded from a CDN — everything else in this
+    file is self-contained.
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script>
+  (function () {
+    var blocks = Array.prototype.slice.call(document.querySelectorAll('pre.mermaid'));
+
+    if (typeof mermaid === 'undefined') {
+      document.documentElement.classList.add('no-mermaid');
+      return;
+    }
+
+    // Keep each diagram's source: mermaid replaces the element's content with SVG, so a
+    // re-render after a theme change needs the original text back.
+    blocks.forEach(function (b) { b.dataset.src = b.textContent; });
+
+    function token(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function render() {
+      var surface = token('--surface');
+      var ink     = token('--ink');
+      var soft    = token('--ink-soft');
+      var rule    = token('--rule-strong');
+      var accent  = token('--accent');
+      var wash    = token('--accent-wash');
+      var ground  = token('--diagram-bg');
+
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: 'base',
+        fontFamily: '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif',
+        themeVariables: {
+          background:           ground,
+          primaryColor:         surface,
+          primaryTextColor:     ink,
+          primaryBorderColor:   rule,
+          secondaryColor:       wash,
+          tertiaryColor:        ground,
+          mainBkg:              surface,
+          nodeBorder:           rule,
+          nodeTextColor:        ink,
+          lineColor:            soft,
+          textColor:            ink,
+          clusterBkg:           ground,
+          clusterBorder:        rule,
+          titleColor:           accent,
+          edgeLabelBackground:  ground,
+          actorBkg:             surface,
+          actorBorder:          rule,
+          actorTextColor:       ink,
+          actorLineColor:       soft,
+          signalColor:          ink,
+          signalTextColor:      ink,
+          labelBoxBkgColor:     wash,
+          labelBoxBorderColor:  rule,
+          labelTextColor:       ink,
+          loopTextColor:        ink,
+          noteBkgColor:         wash,
+          noteBorderColor:      rule,
+          noteTextColor:        ink
+        }
+      });
+
+      blocks.forEach(function (b) {
+        b.removeAttribute('data-processed');
+        b.textContent = b.dataset.src;
+      });
+
+      mermaid.run({ nodes: blocks }).catch(function () {
+        document.documentElement.classList.add('no-mermaid');
+      });
+    }
+
+    render();
+
+    // The viewer can flip their OS theme while the page is open; the SVG is baked, so redraw.
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    if (mq.addEventListener) mq.addEventListener('change', render);
+  })();
+</script>
