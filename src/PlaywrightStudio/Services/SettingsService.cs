@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using PlaywrightStudio.Models;
 
 namespace PlaywrightStudio.Services;
@@ -31,7 +31,9 @@ public class SettingsService
         {
             if (File.Exists(_paths.SettingsFile))
             {
-                var s = JsonSerializer.Deserialize<StudioSettings>(File.ReadAllText(_paths.SettingsFile));
+                // Must use the same options as Save: they carry the string-enum converter, and without it
+                // every write-then-read of a video setting throws and silently resets everything.
+                var s = JsonSerializer.Deserialize<StudioSettings>(File.ReadAllText(_paths.SettingsFile), Json);
                 if (s is not null) return s;
             }
         }

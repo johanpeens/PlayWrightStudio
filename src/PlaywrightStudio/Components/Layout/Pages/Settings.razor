@@ -1,8 +1,6 @@
 ﻿@page "/settings"
 @inject SettingsService Service
 @inject StudioPaths Paths
-@inject PlaywrightHost Host
-@inject VideoConverter Video
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 @inject IDialogService Dialogs
@@ -14,97 +12,7 @@
 
 <MudGrid Spacing="3">
     <MudItem xs="12" md="6">
-        <MudPaper Outlined="true" Class="pa-4 mb-3">
-            <MudText Typo="Typo.subtitle1" Class="mb-3">Browser</MudText>
-            <MudSelect T="string" @bind-Value="S.Browser" Label="Engine" Variant="Variant.Outlined" Margin="Margin.Dense">
-                <MudSelectItem Value="@("chromium")">Chromium (bundled)</MudSelectItem>
-                <MudSelectItem Value="@("chrome")">Google Chrome (installed)</MudSelectItem>
-                <MudSelectItem Value="@("msedge")">Microsoft Edge (installed)</MudSelectItem>
-                <MudSelectItem Value="@("firefox")">Firefox (bundled)</MudSelectItem>
-                <MudSelectItem Value="@("webkit")">WebKit (bundled)</MudSelectItem>
-            </MudSelect>
-
-            <div class="d-flex gap-2 mt-3">
-                <MudNumericField T="int" @bind-Value="S.ViewportWidth" Label="Viewport width" Min="320" Max="3840"
-                                 Variant="Variant.Outlined" Margin="Margin.Dense" />
-                <MudNumericField T="int" @bind-Value="S.ViewportHeight" Label="Viewport height" Min="320" Max="2160"
-                                 Variant="Variant.Outlined" Margin="Margin.Dense" />
-            </div>
-
-            <MudSwitch T="bool" @bind-Value="S.Headless" Color="Color.Primary" Class="mt-3"
-                       Label="Run headless (no window)" />
-            <MudSwitch T="bool" @bind-Value="S.IgnoreHttpsErrors" Color="Color.Primary"
-                       Label="Ignore https certificate errors (dev servers)" />
-            <MudSwitch T="bool" @bind-Value="S.KeepBrowserOpenAfterRun" Color="Color.Primary"
-                       Label="Leave the browser open after a run" />
-
-            <MudDivider Class="my-3" />
-
-            <MudSwitch T="bool" @bind-Value="S.AttachToMyBrowser" Color="Color.Primary"
-                       Label="Use the browser I am already in" />
-            <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">
-                Runs open a tab in your own browser - your logins, your cookies - and the tab stays
-                open afterwards so you can carry on from wherever the run stopped.
-            </MudText>
-
-            @if (S.AttachToMyBrowser)
-            {
-                <MudTextField @bind-Value="S.CdpEndpoint" Label="Debugging endpoint" Variant="Variant.Outlined"
-                              Margin="Margin.Dense" Class="mt-2 mono" />
-                <div class="d-flex gap-2 flex-wrap mt-2">
-                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.OpenInBrowser" OnClick="OpenDebuggable">
-                        Open a debuggable browser
-                    </MudButton>
-                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="_attachBusy"
-                               StartIcon="@Icons.Material.Filled.NetworkCheck" OnClick="CheckAttachAsync">
-                        Check connection
-                    </MudButton>
-                </div>
-                @if (_attachMessage is not null)
-                {
-                    <MudAlert Severity="@(_attachOk ? Severity.Success : Severity.Warning)" Dense="true" Class="mt-2">
-                        @_attachMessage
-                    </MudAlert>
-                }
-                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-2">
-                    A browser started normally cannot be attached to - Chromium refuses remote debugging
-                    on your everyday profile. The button opens one with its own profile folder; use that
-                    window for the studio and for whatever you are testing.
-                </MudText>
-            }
-
-            <MudTextField @bind-Value="S.StorageStatePath" Label="Signed-in state file (optional)"
-                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3"
-                          HelperText="Path to a Playwright storageState json, so runs start already logged in." />
-        </MudPaper>
-
-        <MudPaper Outlined="true" Class="pa-4">
-            <MudText Typo="Typo.subtitle1" Class="mb-3">Browser binaries</MudText>
-            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
-                Playwright needs its own browser builds. Chrome and Edge use what is already installed.
-            </MudText>
-            <div class="d-flex gap-2 flex-wrap">
-                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.NetworkCheck"
-                           Disabled="_busy" OnClick="ProbeAsync">Check</MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download"
-                           Disabled="_busy" OnClick="@(() => InstallAsync(S.Browser))">
-                    Install @S.Browser
-                </MudButton>
-                <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="@(() => InstallAsync(null))">
-                    Install all engines
-                </MudButton>
-            </div>
-            @if (_busy)
-            {
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-3" />
-            }
-            @if (!string.IsNullOrWhiteSpace(_output))
-            {
-                <pre class="code-block mt-3" style="max-height:220px">@_output</pre>
-            }
-        </MudPaper>
-    </MudItem>
+                    </MudItem>
 
     <MudItem xs="12" md="6">
         <MudPaper Outlined="true" Class="pa-4 mb-3">
@@ -116,64 +24,12 @@
             </MudSlider>
             <MudSwitch T="bool" @bind-Value="S.ScreenshotOnFailure" Color="Color.Primary" Label="Screenshot on failure" />
             <MudSwitch T="bool" @bind-Value="S.ScreenshotEveryStep" Color="Color.Primary" Label="Screenshot every step" />
-            <MudSwitch T="bool" @bind-Value="S.RecordTrace" Color="Color.Primary"
-                       Label="Record a Playwright trace (open with: playwright show-trace trace.zip)" />
-            <MudSwitch T="bool" @bind-Value="S.RecordVideo" Color="Color.Primary" Label="Record video of the run (mp4)" />
-            @if (S.RecordVideo)
-            {
-                <div class="d-flex gap-2 mt-2">
-                    <MudSelect T="VideoResolution" @bind-Value="S.VideoResolution" Label="Frame size"
-                               Variant="Variant.Outlined" Margin="Margin.Dense">
-                        <MudSelectItem Value="@VideoResolution.MatchViewport">
-                            Match viewport - @S.ViewportWidth x @S.ViewportHeight (sharpest)
-                        </MudSelectItem>
-                        <MudSelectItem Value="@VideoResolution.Hd720">1280 x 720</MudSelectItem>
-                        <MudSelectItem Value="@VideoResolution.Hd1080">1920 x 1080</MudSelectItem>
-                        <MudSelectItem Value="@VideoResolution.PlaywrightDefault">
-                            Playwright default (shrunk to an 800px box)
-                        </MudSelectItem>
-                    </MudSelect>
-                    <MudSelect T="VideoQuality" @bind-Value="S.VideoQuality" Label="Quality"
-                               Variant="Variant.Outlined" Margin="Margin.Dense">
-                        <MudSelectItem Value="@VideoQuality.High">High - sharp text, larger file</MudSelectItem>
-                        <MudSelectItem Value="@VideoQuality.Balanced">Balanced</MudSelectItem>
-                        <MudSelectItem Value="@VideoQuality.Small">Small file</MudSelectItem>
-                    </MudSelect>
-                </div>
-                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-1">
-                    Playwright shrinks video to fit an 800px box unless told otherwise, which is why
-                    text in a recording can look soft. Matching the viewport keeps it readable.
-                </MudText>
-
-                <MudAlert Severity="@(_video?.CanMakeMp4 == true ? Severity.Success : Severity.Warning)"
-                          Dense="true" Class="mt-2">
-                    @(_video?.Message ?? "Checking for ffmpeg…")
-                </MudAlert>
-                <MudTextField @bind-Value="S.FfmpegPath" Label="ffmpeg path (optional)" Variant="Variant.Outlined"
-                              Margin="Margin.Dense" Class="mt-2"
-                              HelperText="Leave blank to look on PATH and the usual install folders."
-                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Refresh"
-                              OnAdornmentClick="ProbeVideoAsync" />
-                @if (_video?.CanMakeMp4 != true)
-                {
-                    <MudButton Variant="Variant.Filled" Color="Color.Warning" Class="mt-2"
-                               StartIcon="@Icons.Material.Filled.Download" Disabled="_downloading"
-                               OnClick="DownloadFfmpegAsync">
-                        Download ffmpeg (~130 MB)
-                    </MudButton>
-                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-1">
-                        Lands in the studio's own tools folder - nothing is installed machine-wide.
-                    </MudText>
-                }
-                @if (_downloading || _downloadStatus is not null)
-                {
-                    @if (_downloading)
-                    {
-                        <MudProgressLinear Indeterminate="true" Color="Color.Warning" Class="mt-2" />
-                    }
-                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-1">@_downloadStatus</MudText>
-                }
-            }
+            <MudSwitch T="bool" @bind-Value="S.RecordVideo" Color="Color.Primary"
+                       Label="Record the session, so a run can be replayed and scrubbed" />
+            <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">
+                Captures the page as it changes, rather than a video file. Smaller, and you can stop
+                on any moment and inspect what was on the page.
+            </MudText>
         </MudPaper>
 
         <MudPaper Outlined="true" Class="pa-4 mb-3">
@@ -243,11 +99,6 @@
 
 @code {
     private StudioSettings S => Service.Current;
-    private bool _busy;
-    private string? _output;
-    private VideoConverter.Capability? _video;
-    private bool _downloading;
-    private string? _downloadStatus;
 
     // ---------------------------------------------------------------- data folder
 
@@ -330,85 +181,11 @@
         _folderNoteSeverity = severity;
     }
 
-    private async Task DownloadFfmpegAsync()
-    {
-        _downloading = true;
-        _downloadStatus = "Starting…";
-        StateHasChanged();
-
-        var progress = new Progress<string>(m => InvokeAsync(() => { _downloadStatus = m; StateHasChanged(); }));
-        var (ok, message) = await Video.DownloadAsync(progress);
-
-        _downloading = false;
-        _downloadStatus = message;
-        _video = await Video.ProbeAsync(force: true);
-        Snackbar.Add(message, ok ? Severity.Success : Severity.Error);
-        StateHasChanged();
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender || !S.RecordVideo) return;
-        await ProbeVideoAsync();
-    }
-
-    private bool _attachBusy;
-    private bool _attachOk;
-    private string? _attachMessage;
-
-    private void OpenDebuggable()
-    {
-        var profile = System.IO.Path.Combine(Paths.Root, "browser-profile");
-        var (ok, message) = Host.OpenDebuggableBrowser(S, profile, Nav.BaseUri);
-        _attachOk = ok;
-        _attachMessage = message;
-        Snackbar.Add(message, ok ? Severity.Success : Severity.Error);
-    }
-
-    private async Task CheckAttachAsync()
-    {
-        _attachBusy = true;
-        _attachMessage = "Looking for a debuggable browser…";
-        StateHasChanged();
-
-        var (ok, message) = await Host.ProbeAttachAsync(S);
-        _attachOk = ok;
-        _attachMessage = message;
-        _attachBusy = false;
-    }
-
-    private async Task ProbeVideoAsync()
-    {
-        _video = await Video.ProbeAsync(force: true);
-        StateHasChanged();
-    }
-
     private async Task Save()
     {
         Service.Save(S);
         Snackbar.Add("Settings saved", Severity.Success);
-        if (S.RecordVideo) await ProbeVideoAsync();
     }
 
-    private async Task ProbeAsync()
-    {
-        _busy = true;
-        _output = "Starting " + S.Browser + "…";
-        StateHasChanged();
-        var (ok, message) = await Host.ProbeAsync(S);
-        _output = message;
-        _busy = false;
-        Snackbar.Add(ok ? "Browser is ready" : "Browser could not start", ok ? Severity.Success : Severity.Error);
-    }
 
-    private async Task InstallAsync(string? browser)
-    {
-        _busy = true;
-        _output = "Running playwright install… this downloads a few hundred MB the first time.";
-        StateHasChanged();
-        var (ok, output) = await Host.InstallBrowsersAsync(browser);
-        _output = string.IsNullOrWhiteSpace(output) ? (ok ? "Done." : "Failed.") : output;
-        _busy = false;
-        Snackbar.Add(ok ? "Install finished" : "Install failed - see the output", ok ? Severity.Success : Severity.Error);
-    }
 }

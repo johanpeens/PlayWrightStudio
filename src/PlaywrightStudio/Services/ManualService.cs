@@ -1,7 +1,6 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using Markdig;
-using Microsoft.Playwright;
 using PlaywrightStudio.Models;
 
 namespace PlaywrightStudio.Services;
@@ -17,14 +16,12 @@ public sealed class ManualService
         .DisableHtml()                 // the manual is generated, not a place to inject markup
         .Build();
 
-    private readonly PlaywrightHost _host;
     private readonly StudioPaths _paths;
     private readonly ManualStore _manuals;
     private readonly ILogger<ManualService> _log;
 
-    public ManualService(PlaywrightHost host, StudioPaths paths, ManualStore manuals, ILogger<ManualService> log)
+    public ManualService(StudioPaths paths, ManualStore manuals, ILogger<ManualService> log)
     {
-        _host = host;
         _paths = paths;
         _manuals = manuals;
         _log = log;
@@ -80,36 +77,6 @@ public sealed class ManualService
 
     // ------------------------------------------------------------------ the document
 
-    public async Task<string> BuildPdfAsync(Manual manual, CancellationToken ct = default)
-    {
-        var html = BuildHtml(manual);
-        var path = Path.Combine(_manuals.FolderFor(manual.Id), CodeExporter.Slug(manual.Title) + ".pdf");
-
-        // Only Chromium can print to pdf, whatever engine the rest of the studio is set to.
-        var pw = await _host.GetAsync();
-        await using var browser = await pw.Chromium.LaunchAsync(new() { Headless = true });
-        var context = await browser.NewContextAsync();
-        var page = await context.NewPageAsync();
-
-        await page.SetContentAsync(html, new() { WaitUntil = WaitUntilState.Load });
-        await page.PdfAsync(new PagePdfOptions
-        {
-            Path = path,
-            Format = "A4",
-            PrintBackground = true,
-            Margin = new Margin { Top = "14mm", Bottom = "16mm", Left = "14mm", Right = "14mm" },
-            DisplayHeaderFooter = true,
-            HeaderTemplate = "<div></div>",
-            FooterTemplate =
-                "<div style=\"width:100%;font:9px -apple-system,Segoe UI,sans-serif;color:#8a94a3;"
-                + "padding:0 14mm;display:flex;justify-content:space-between\">"
-                + $"<span>{WebUtility.HtmlEncode(manual.Title)}</span>"
-                + "<span>Page <span class=\"pageNumber\"></span> of <span class=\"totalPages\"></span></span></div>"
-        });
-
-        await context.CloseAsync();
-        return path;
-    }
 
     /// <summary>The same document as html - used for the on-screen preview and for the pdf.</summary>
     public string BuildHtml(Manual manual)

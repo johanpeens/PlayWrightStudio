@@ -3,6 +3,7 @@
 @inject ManualStore Store
 @inject ManualService Manuals
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 @inject IDialogService Dialogs
 @inject ISnackbar Snackbar
 
@@ -28,7 +29,7 @@ else
         </MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_building"
                    StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="DownloadAsync">
-            @(_building ? "Building…" : "Download PDF")
+            Print / Save as PDF
         </MudButton>
     </div>
 
@@ -223,8 +224,9 @@ else
         _building = true;
         try
         {
-            var path = await Manuals.BuildPdfAsync(_manual);
-            Nav.NavigateTo($"/download/manual/{_manual.Id}/{System.IO.Path.GetFileName(path)}", forceLoad: true);
+            // The browser makes the pdf. Its print dialog has "Save as PDF", and it prints
+            // exactly what the preview shows.
+            await JS.InvokeVoidAsync("open", $"/manual/{_manual.Id}/print", "_blank");
         }
         catch (Exception ex)
         {

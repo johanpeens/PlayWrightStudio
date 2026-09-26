@@ -4,7 +4,6 @@
 @inject NavigationManager Nav
 @inject IDialogService Dialogs
 @inject ISnackbar Snackbar
-@inject PlaywrightHost Host
 @inject SettingsService Settings
 @inject StudioPaths Paths
 
@@ -37,18 +36,6 @@
     </MudText>
 }
 
-@if (_browserWarning is not null)
-{
-    <MudAlert Severity="Severity.Warning" Class="mb-4" Dense="true"
-              ContentAlignment="HorizontalAlignment.Left">
-        <div class="d-flex align-center gap-4 flex-wrap">
-            <span>@_browserWarning</span>
-            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Warning" Href="/settings">
-                Install browsers
-            </MudButton>
-        </div>
-    </MudAlert>
-}
 
 @if (_scenarios.Count == 0)
 {
@@ -159,7 +146,6 @@ else
     private List<Scenario> _scenarios = new();
     private Dictionary<string, RunResult> _lastRuns = new();
     private string _filter = "";
-    private string? _browserWarning;
 
     private IEnumerable<Scenario> Filtered =>
         string.IsNullOrWhiteSpace(_filter)
@@ -171,18 +157,7 @@ else
 
     protected override void OnInitialized() => Load();
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender) return;
-        var (ok, message) = await Host.ProbeAsync(Settings.Current);
-        if (!ok)
-        {
-            _browserWarning = $"Playwright cannot start {Settings.Current.Browser}: {Trim(message)}";
-            await InvokeAsync(StateHasChanged);
-        }
-    }
 
-    private static string Trim(string s) => s.Length > 180 ? s[..180] + "…" : s;
 
     private void Load()
     {

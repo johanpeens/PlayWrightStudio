@@ -1,7 +1,8 @@
 ﻿@page "/scenario/{Id}"
 @inject ScenarioStore Store
 @inject RecorderService Recorder
-@inject RunnerService Runner
+@inject PageSessions Pages
+@inject PageRunner PageRun
 @inject SettingsService Settings
 @inject NavigationManager Nav
 @inject IDialogService Dialogs
@@ -34,24 +35,6 @@ else
         </div>
         <MudSpacer />
         <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Code" OnClick="ExportAsync">Export</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PlayArrow"
-                   Disabled="@(Runner.IsRunning || _scenario.EnabledStepCount == 0)" OnClick="@(() => RunAsync(0))">
-            Run
-        </MudButton>
-        <MudTooltip Text="@(Recorder.IsLive
-            ? "Run in the browser window that is already open, with a Stop button on the page"
-            : "Opens a browser window you can watch, with a Stop button on the page. It stays open afterwards.")">
-            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Visibility"
-                       Disabled="@(Runner.IsRunning || Recorder.IsPlaying || _scenario.EnabledStepCount == 0)"
-                       OnClick="@(() => WatchAsync())">
-                @(Recorder.IsLive ? "Run here" : "Watch")
-            </MudButton>
-        </MudTooltip>
-        @if (Runner.IsRunning)
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Stop"
-                       OnClick="@(() => Runner.Abort())">Stop</MudButton>
-        }
     </div>
 
     <MudGrid Spacing="3">
@@ -60,30 +43,57 @@ else
             <MudPaper Outlined="true" Class="pa-3 mb-3 recorder-bar">
                 @if (!Recorder.IsLive)
                 {
+                    @* Real anchors with target="_blank", not window.open over SignalR: a genuine
+                       click opens the tab natively and no popup blocker gets involved. The click
+                       also starts the studio waiting for that tab to call home. *@
                     <div class="d-flex align-center gap-3 flex-wrap">
-                        @* Outlined rather than filled: red still reads as "record", but a solid
-                           red block here competes with Run for the eye on a screen where Run is
-                           the primary action. *@
-                        <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                        @* Href makes MudButton render a real anchor, so target="_blank" opens the
+                           tab natively. A button nested inside a link would not navigate at all. *@
+                        <MudButton Href="@LaunchUrl" Target="_blank"
+                                   Variant="Variant.Outlined" Color="Color.Error"
                                    StartIcon="@Icons.Material.Filled.FiberManualRecord"
-                                   Disabled="@(Runner.IsRunning || _starting)"
-                                   OnClick="StartRecordingAsync">
+                                   Disabled="@(_waitingForTab || string.IsNullOrWhiteSpace(_scenario.StartUrl))"
+                                   OnClick="WaitForLaunchAsync">
                             @(_scenario.Steps.Count == 0 ? "Start recording" : "Record more steps")
                         </MudButton>
-                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
-                            Opens a real browser. Close that window when you are done - the steps save themselves.
-                        </MudText>
-                        @if (Recorder.Steps.Count > 0)
+
+                        <MudButton Href="@LaunchUrl" Target="_blank"
+                                   Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   Disabled="@(_waitingForTab || PageRun.IsRunning
+                                               || _scenario.EnabledStepCount == 0
+                                               || string.IsNullOrWhiteSpace(_scenario.StartUrl))"
+                                   OnClick="RunInNewTabAsync">
+                            Run
+                        </MudButton>
+
+                        @if (PageRun.IsRunning)
                         {
-                            @* Only reachable if a save failed - the steps are still here, so offer a retry. *@
-                            <MudSpacer />
-                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Warning"
-                                       StartIcon="@Icons.Material.Filled.PlaylistAdd" OnClick="KeepRecording">
-                                Save @Recorder.Steps.Count unsaved step@(Recorder.Steps.Count == 1 ? "" : "s")
-                            </MudButton>
-                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="DiscardRecording">Discard</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.Stop"
+                                       OnClick="@(() => PageRun.Abort())">Stop</MudButton>
                         }
+
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                            @if (_waitingForTab)
+                            {
+                                <span>Waiting for the new tab to connect…</span>
+                            }
+                            else if (string.IsNullOrWhiteSpace(_scenario.StartUrl))
+                            {
+                                <span>Give the scenario a start url first.</span>
+                            }
+                            else
+                            {
+                                <span>Opens <b>@DisplayUrl</b> in a new tab of this browser and starts recording.</span>
+                            }
+                        </MudText>
                     </div>
+
+                    @if (_launchProblem is not null)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@_launchProblem</MudAlert>
+                    }
                 }
                 else
                 {
@@ -129,6 +139,72 @@ else
                 @if (!string.IsNullOrWhiteSpace(Recorder.StatusMessage))
                 {
                     <MudText Typo="Typo.caption" Class="mud-text-secondary mt-2 d-block">@Recorder.StatusMessage</MudText>
+                }
+            </MudPaper>
+
+
+            @* ------------------------------------------------- pages that called home *@
+            @* Nothing is launched here. A page appears in this list because it loaded the
+               studio's script and opened a socket - the user browsed to it themselves. *@
+            <MudPaper Outlined="true" Class="pa-3 mb-3">
+                <div class="d-flex align-center mb-1">
+                    <MudText Typo="Typo.subtitle2">Your open pages</MudText>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="ml-2">
+                        @Pages.All().Count connected
+                    </MudChip>
+                    <MudSpacer />
+                    <MudButton Size="Size.Small" Variant="Variant.Text"
+                               StartIcon="@Icons.Material.Filled.Code" OnClick="@(() => _showSnippet = !_showSnippet)">
+                        How do I connect a page?
+                    </MudButton>
+                </div>
+
+                @if (_showSnippet)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
+                        Add this one line to the app you want to test, in its development build.
+                        Nothing is installed, and the studio never opens a browser.
+                    </MudText>
+                    <pre class="code-block mb-2">&lt;script src="@(Nav.BaseUri)pws.js"&gt;&lt;/script&gt;</pre>
+                }
+
+                @if (Pages.All().Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                        No pages yet. Open the app you are testing in another tab - once it loads the
+                        script above it shows up here.
+                    </MudText>
+                }
+                else
+                {
+                    @foreach (var tab in Pages.All())
+                    {
+                        <div class="d-flex align-center gap-2 py-1 flex-wrap">
+                            <MudIcon Icon="@Icons.Material.Filled.Tab" Size="Size.Small"
+                                     Color="@(tab.IsClaimed ? Color.Primary : Color.Default)" />
+                            <div style="min-width:0;flex:1 1 240px">
+                                <MudText Typo="Typo.body2" Class="text-truncate">@tab.Title</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary mono text-truncate d-block">
+                                    @tab.Url
+                                </MudText>
+                            </div>
+                            @if (tab.IsClaimed)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">in use</MudChip>
+                            }
+                            else
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
+                                           StartIcon="@Icons.Material.Filled.FiberManualRecord"
+                                           Disabled="@(Recorder.IsLive || PageRun.IsRunning)"
+                                           OnClick="@(() => RecordOnAsync(tab))">Record here</MudButton>
+                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.PlayArrow"
+                                           Disabled="@(PageRun.IsRunning || _scenario.EnabledStepCount == 0)"
+                                           OnClick="@(() => RunOnAsync(tab))">Run here</MudButton>
+                            }
+                        </div>
+                    }
                 }
             </MudPaper>
 
@@ -219,9 +295,6 @@ else
                                                            title="Highlight in the live browser"
                                                            OnClick="@(() => TestSelectorAsync(step))" />
                                         }
-                                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small"
-                                                       title="Run from here" Disabled="Runner.IsRunning"
-                                                       OnClick="@(() => RunAsync(index))" />
                                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                                        title="Edit step" OnClick="@(() => EditStepAsync(step))" />
                                         <MudIconButton Size="Size.Small"
@@ -287,7 +360,7 @@ else
 
         @* ------------------------------------------------------------ right rail *@
         <MudItem xs="12" md="4">
-            @if (Runner.Current is { } run && run.ScenarioId == _scenario.Id)
+            @if (PageRun.Current is { } run && run.ScenarioId == _scenario.Id)
             {
                 <MudPaper Outlined="true" Class="pa-3 mb-3">
                     <div class="d-flex align-center">
@@ -297,7 +370,7 @@ else
                             @run.Status.ToString().ToLowerInvariant()
                         </MudChip>
                     </div>
-                    @if (Runner.IsRunning)
+                    @if (PageRun.IsRunning)
                     {
                         <MudProgressLinear Color="Color.Info" Indeterminate="true" Class="my-2" />
                     }
@@ -398,14 +471,15 @@ else
 
     private Scenario? _scenario;
     private bool _revealSecrets;
-    private bool _starting;
     private bool _autoStarted;
 
     protected override void OnInitialized()
     {
         Recorder.Changed += OnChanged;
         Recorder.Committed += OnRecordingSaved;
-        Runner.Changed += OnChanged;
+        
+        Pages.Changed += OnChanged;
+        PageRun.Changed += OnChanged;
     }
 
     protected override void OnParametersSet() => _scenario = Store.Get(Id);
@@ -416,7 +490,6 @@ else
         if (AutoRecord == "1" && _scenario is not null && !Recorder.IsLive)
         {
             _autoStarted = true;
-            await StartRecordingAsync();
         }
     }
 
@@ -446,42 +519,14 @@ else
     {
         Recorder.Changed -= OnChanged;
         Recorder.Committed -= OnRecordingSaved;
-        Runner.Changed -= OnChanged;
+        
+        Pages.Changed -= OnChanged;
+        PageRun.Changed -= OnChanged;
+        Pages.ReleaseAllFor(_circuitId);
     }
 
     // ------------------------------------------------------------------ recording
 
-    private async Task StartRecordingAsync()
-    {
-        if (_scenario is null) return;
-        Save(silent: true);
-        _starting = true;
-        try
-        {
-            var url = _scenario.StartUrl;
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                var result = await Dialogs.ShowAsync<UrlPromptDialog>("Where should recording start?",
-                    new DialogParameters<UrlPromptDialog> { { x => x.Url, "" } });
-                var outcome = await result.Result;
-                if (outcome is { Canceled: false, Data: string entered } && !string.IsNullOrWhiteSpace(entered))
-                {
-                    url = entered.Trim();
-                    _scenario.StartUrl = url;
-                    Save(silent: true);
-                }
-                else
-                {
-                    return;
-                }
-            }
-            await Recorder.StartAsync(url, _scenario.Id);
-        }
-        finally
-        {
-            _starting = false;
-        }
-    }
 
     private async Task TogglePauseAsync() => await Recorder.SetPausedAsync(Recorder.State != RecorderState.Paused);
 
@@ -538,34 +583,6 @@ else
     /// Runs in the window that is already open. If none is, opens one first and leaves it open,
     /// so the next run reuses it rather than stacking up windows.
     /// </summary>
-    private async Task WatchAsync()
-    {
-        if (_scenario is null) return;
-        Save(silent: true);
-
-        RunResult? run;
-
-        if (Settings.Current.AttachToMyBrowser)
-        {
-            // The run opens a tab in the browser you are already using, and leaves it there.
-            run = await Runner.RunAsync(_scenario, 0, headlessOverride: false);
-        }
-        else
-        {
-            if (!await EnsureSessionAsync()) return;
-            run = await Recorder.RunHereAsync(_scenario);
-            if (run is null)
-            {
-                Snackbar.Add("The window is busy - wait for the current run to finish.", Severity.Warning);
-                return;
-            }
-        }
-
-        Snackbar.Add(run.Status == RunStatus.Passed
-            ? $"Run passed - {run.Passed} steps in {run.Duration.TotalSeconds:0.0}s. The window is yours again."
-            : $"Run {run.Status.ToString().ToLowerInvariant()} - {run.Error}",
-            run.Status == RunStatus.Passed ? Severity.Success : Severity.Error);
-    }
 
     /// <summary>
     /// Anything that acts on "the open window" needs one. Opens it on demand rather than hiding
@@ -574,7 +591,6 @@ else
     private async Task<bool> EnsureSessionAsync()
     {
         if (Recorder.IsLive) return true;
-        await StartRecordingAsync();
         if (!Recorder.IsLive) return false;         // no start url, or it could not open
         await Task.Delay(500);                      // let the first page settle
         return true;
@@ -666,6 +682,181 @@ else
 
     // ------------------------------------------------------------------ run / save / export
 
+    private bool _showSnippet;
+    private bool _waitingForTab;
+    private string? _launchProblem;
+    private string _launchToken = Guid.NewGuid().ToString("n");
+
+    /// <summary>
+    /// The start url with a one-time token on it, so the tab that opens can be told apart from
+    /// every other tab the user has.
+    /// </summary>
+    private string LaunchUrl
+    {
+        get
+        {
+            var raw = (_scenario?.StartUrl ?? "").Trim();
+            if (raw.Length == 0) return "about:blank";
+
+            // "www.bbc.com" is a relative url as far as a browser is concerned, so it would be
+            // resolved against the studio's own origin and land on a Not Found page.
+            // The "//" matters: without it "localhost:5050/demo" looks like the scheme
+            // "localhost" and would be left alone.
+            if (!System.Text.RegularExpressions.Regex.IsMatch(raw, "^[a-zA-Z][a-zA-Z0-9+.-]*://"))
+                raw = "https://" + raw;
+
+            // The token goes in the query and must come BEFORE any #fragment, or a hash-routed
+            // app never sees it in location.search.
+            var hash = raw.IndexOf('#');
+            var body = hash >= 0 ? raw[..hash] : raw;
+            var fragment = hash >= 0 ? raw[hash..] : "";
+            var join = body.Contains('?') ? "&" : "?";
+
+            return $"{body}{join}__pws={_launchToken}{fragment}";
+        }
+    }
+
+    /// <summary>The launch url without the token, which is noise to a reader.</summary>
+    private string DisplayUrl
+    {
+        get
+        {
+            var url = LaunchUrl;
+            var cut = url.IndexOf("__pws=", StringComparison.Ordinal);
+            if (cut < 1) return url;
+            return url[..(cut - 1)].TrimEnd('?', '&');
+        }
+    }
+
+    /// <summary>Opens the start url in a new tab and replays the scenario there.</summary>
+    private async Task RunInNewTabAsync()
+    {
+        if (_scenario is null || _waitingForTab || PageRun.IsRunning) return;
+
+        _waitingForTab = true;
+        _launchProblem = null;
+        var token = _launchToken;
+        _launchToken = Guid.NewGuid().ToString("n");
+
+        PageSession? tab = null;
+        try
+        {
+            tab = await Pages.WaitForTokenAsync(token, TimeSpan.FromSeconds(20));
+
+            if (tab is null)
+            {
+                _launchProblem =
+                    "That tab opened but never called home. The page needs the studio's script in it.";
+                return;
+            }
+
+            if (!Pages.TryClaim(tab.Id, _circuitId))
+            {
+                _launchProblem = "Somebody else is using that tab.";
+                return;
+            }
+
+            _waitingForTab = false;
+            await InvokeAsync(StateHasChanged);
+
+            var run = await PageRun.RunAsync(tab, _scenario);
+            Snackbar.Add(run.Status == RunStatus.Passed
+                    ? $"Passed - {run.Passed} steps"
+                    : $"{run.Status} - {run.Failed} failed",
+                run.Status == RunStatus.Passed ? Severity.Success : Severity.Error);
+        }
+        finally
+        {
+            _waitingForTab = false;
+            if (tab is not null) Pages.Release(tab.Id);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    /// <summary>
+    /// Runs as the browser opens the tab. Waits for that tab to load the studio's script and
+    /// call home, then starts recording in it - so pressing Record is the only thing the user
+    /// has to do.
+    /// </summary>
+    private async Task WaitForLaunchAsync()
+    {
+        if (_scenario is null || _waitingForTab) return;
+
+        _waitingForTab = true;
+        _launchProblem = null;
+        var token = _launchToken;
+        _launchToken = Guid.NewGuid().ToString("n");   // next launch gets a fresh one
+
+        try
+        {
+            var tab = await Pages.WaitForTokenAsync(token, TimeSpan.FromSeconds(20));
+
+            if (tab is null)
+            {
+                _launchProblem =
+                    "That tab opened but never called home. The page needs the studio's script in it - "
+                    + "press \"How do I connect a page?\" below for the one line to add.";
+                return;
+            }
+
+            if (!Pages.TryClaim(tab.Id, _circuitId))
+            {
+                _launchProblem = "Somebody else is already recording in that tab.";
+                return;
+            }
+
+            await Recorder.AttachAsync(tab, _scenario.Id);
+            Snackbar.Add("Recording. Click through the new tab and the steps appear here.", Severity.Success);
+        }
+        finally
+        {
+            _waitingForTab = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    /// <summary>Takes a page the user already has open and records in it.</summary>
+    private async Task RecordOnAsync(PageSession page)
+    {
+        if (_scenario is null) return;
+
+        if (!Pages.TryClaim(page.Id, _circuitId))
+        {
+            Snackbar.Add("Somebody else just took that page.", Severity.Warning);
+            return;
+        }
+
+        await Recorder.AttachAsync(page, _scenario.Id);
+        Snackbar.Add($"Recording in {page.Title}. Click through it - steps appear here.", Severity.Success);
+    }
+
+    /// <summary>Replays the scenario in a page the user already has open.</summary>
+    private async Task RunOnAsync(PageSession page)
+    {
+        if (_scenario is null) return;
+
+        if (!Pages.TryClaim(page.Id, _circuitId))
+        {
+            Snackbar.Add("Somebody else just took that page.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var run = await PageRun.RunAsync(page, _scenario);
+            Snackbar.Add(run.Status == RunStatus.Passed
+                ? $"Passed - {run.Passed} steps"
+                : $"{run.Status} - {run.Failed} failed", 
+                run.Status == RunStatus.Passed ? Severity.Success : Severity.Error);
+        }
+        finally
+        {
+            Pages.Release(page.Id);
+        }
+    }
+
+    private readonly string _circuitId = Guid.NewGuid().ToString("n");
+
     private void Save() => Save(silent: false);
 
     private void Save(bool silent)
@@ -676,20 +867,6 @@ else
     }
 
     /// <summary>watch forces a visible browser regardless of the headless setting.</summary>
-    private async Task RunAsync(int startIndex, bool watch = false)
-    {
-        if (_scenario is null) return;
-        Save(silent: true);
-        await Runner.RunAsync(_scenario, startIndex, watch ? false : null);
-        var run = Runner.Current;
-        if (run is not null)
-        {
-            Snackbar.Add(run.Status == RunStatus.Passed
-                ? $"Run passed - {run.Passed} steps in {run.Duration.TotalSeconds:0.0}s"
-                : $"Run {run.Status.ToString().ToLowerInvariant()} - {run.Error}",
-                run.Status == RunStatus.Passed ? Severity.Success : Severity.Error);
-        }
-    }
 
     private async Task ExportAsync()
     {
@@ -716,7 +893,7 @@ else
 
     private StepResult? ResultFor(int index)
     {
-        var run = Runner.Current;
+        var run = PageRun.Current;
         if (run is null || _scenario is null || run.ScenarioId != _scenario.Id) return null;
         if (index >= run.Steps.Count) return null;
         var result = run.Steps[index];

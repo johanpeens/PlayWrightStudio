@@ -1,5 +1,4 @@
-using System.Text.Json;
-using Microsoft.Playwright;
+﻿using System.Text.Json;
 using PlaywrightStudio.Models;
 
 namespace PlaywrightStudio.Services;
@@ -12,33 +11,39 @@ public sealed class RecorderService : IAsyncDisposable
 {
     private static readonly TimeSpan NavigationGrace = TimeSpan.FromMilliseconds(1500);
 
-    private readonly PlaywrightHost _host;
     private readonly SettingsService _settings;
     private readonly ScenarioStore _scenarios;
-    private readonly RunnerService _runner;
     private readonly ILogger<RecorderService> _log;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _stepLock = new();
 
-    private IBrowser? _browser;
-    private IBrowserContext? _context;
-    private IPage? _page;
-    private string? _recorderJs;
+
+    /// <summary>
+    /// Set when recording a page the user already had open, instead of one launched here.
+    /// The two modes share everything downstream - OnRecorderMessage does not care where the
+    /// json came from.
+    /// </summary>
+    private PageSession? _attached;
+
+    /// <summary>True when recording a page the user opened, rather than a launched browser.</summary>
+    public bool IsAttached => _attached is not null;
+
+    public string? AttachedUrl => _attached?.Url;
     private DateTime _lastInteractionUtc = DateTime.MinValue;
     private string? _lastNavUrl;
     private (string sel, string action, DateTime at) _lastRaw;
     private int _committing;
-    private bool _stopping;
 
-    public RecorderService(PlaywrightHost host, SettingsService settings, ScenarioStore scenarios,
-                           RunnerService runner, ILogger<RecorderService> log)
+    public RecorderService(SettingsService settings, ScenarioStore scenarios,
+                           PageSessions pages, ILogger<RecorderService> log)
     {
-        _host = host;
         _settings = settings;
         _scenarios = scenarios;
-        _runner = runner;
+        _pages = pages;
         _log = log;
     }
+
+    private readonly PageSessions _pages;
 
     /// <summary>True while steps are being replayed into the live window.</summary>
     public bool IsPlaying { get; private set; }
@@ -69,20 +74,19 @@ public sealed class RecorderService : IAsyncDisposable
 
     // ------------------------------------------------------------------ start / stop
 
-    public async Task StartAsync(string startUrl, string scenarioId, IEnumerable<TestStep>? seed = null)
+
+    /// <summary>
+    /// Records a page the user already has open. Nothing is launched: the page called home when
+    /// it loaded the studio's script, and this takes ownership of it.
+    /// </summary>
+    public async Task AttachAsync(PageSession page, string scenarioId, IEnumerable<TestStep>? seed = null)
     {
         await _gate.WaitAsync();
         try
         {
             if (IsLive) return;
 
-            State = RecorderState.Starting;
-            StatusMessage = "Launching browser…";
-            PickAction = null;
             TargetScenarioId = scenarioId;
-            _stopping = false;
-            Raise();
-
             lock (_stepLock)
             {
                 Steps.Clear();
@@ -92,62 +96,12 @@ public sealed class RecorderService : IAsyncDisposable
             _lastNavUrl = null;
             _lastInteractionUtc = DateTime.MinValue;
 
-            _recorderJs ??= await File.ReadAllTextAsync(
-                Path.Combine(AppContext.BaseDirectory, "Assets", "recorder.js"));
-
-            var settings = _settings.Current;
-            // Recording is always headed and never slowed down - you are the one driving.
-            _browser = await _host.LaunchAsync(settings, headless: false, slowMoMs: 0);
-            _context = await _host.NewContextAsync(_browser, settings);
-
-            await _context.ExposeBindingAsync("__pwsEmit", (BindingSource _, string json) => OnRecorderMessage(json));
-            await _context.AddInitScriptAsync(_recorderJs);
-
-            // The session window doubles as the window runs happen in, so give it the run bar
-            // too. It stays invisible until a run calls begin().
-            try
-            {
-                var runBarJs = await File.ReadAllTextAsync(
-                    Path.Combine(AppContext.BaseDirectory, "Assets", "runbar.js"));
-                await _context.ExposeBindingAsync("__pwsRunStop", (BindingSource _, string _) => _runner.Abort());
-                await _context.AddInitScriptAsync(runBarJs);
-            }
-            catch (Exception ex)
-            {
-                _log.LogWarning(ex, "Run bar unavailable in the recording session");
-            }
-
-            _context.Page += (_, page) => WirePage(page);
-            _browser.Disconnected += (_, _) => OnBrowserGone();
-
-            _page = await _context.NewPageAsync();
-            WirePage(_page);
+            _attached = page;
+            page.Message += OnRecorderMessage;
 
             State = RecorderState.Recording;
-            StatusMessage = "Recording. Click through the form in the browser window.";
-            Raise();
-
-            var url = Normalise(startUrl);
-            if (!string.IsNullOrWhiteSpace(url))
-            {
-                CurrentUrl = url;
-                try
-                {
-                    await _page.GotoAsync(url);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = $"Recording, but {url} did not load: {ex.Message}";
-                    Raise();
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "Recorder failed to start");
-            State = RecorderState.Stopped;
-            StatusMessage = "Could not start the recorder: " + ex.Message;
-            await TearDownAsync();
+            StatusMessage = $"Recording {page.Url}";
+            await BroadcastModeAsync("record");
             Raise();
         }
         finally { _gate.Release(); }
@@ -158,7 +112,6 @@ public sealed class RecorderService : IAsyncDisposable
         await _gate.WaitAsync();
         try
         {
-            _stopping = true;
             var saved = Commit();
             await TearDownAsync();
             State = RecorderState.Stopped;
@@ -169,7 +122,6 @@ public sealed class RecorderService : IAsyncDisposable
         }
         finally
         {
-            _stopping = false;
             _gate.Release();
         }
     }
@@ -273,88 +225,59 @@ public sealed class RecorderService : IAsyncDisposable
     /// <summary>Puts the in-page overlay into element-pick mode for an assertion.</summary>
     public Task PickAsync(string action) => BroadcastModeAsync("pick:" + action);
 
+    /// <summary>Tells the page which mode its toolbar should be in: record, paused, or pick.</summary>
     private async Task BroadcastModeAsync(string mode)
     {
-        if (_context is null) return;
-        foreach (var page in _context.Pages)
-        {
-            try { await page.EvaluateAsync("m => window.__pwsSetMode && window.__pwsSetMode(m)", mode); }
-            catch (Exception ex) { _log.LogDebug(ex, "Could not set recorder mode on a page"); }
-        }
+        if (_attached is null) return;
+        await _attached.SendAsync(System.Text.Json.JsonSerializer.Serialize(
+            new { type = "mode", value = mode }));
     }
 
-    /// <summary>Flash the element a selector points at, in the live recording browser.</summary>
+    /// <summary>
+    /// Asks the page how many elements a selector picks out, and flashes an outline over the
+    /// first one. The page answers, because the page is the only thing that can see itself.
+    /// </summary>
     public async Task<string> TrySelectorAsync(string selector, IReadOnlyList<string>? frameChain = null)
     {
-        if (_page is null || !IsLive) return "Start the recorder first - selectors are tested in the live browser.";
-        try
-        {
-            var locator = Resolve(_page, selector, frameChain);
-            var count = await locator.CountAsync();
-            if (count > 0) await locator.First.HighlightAsync();
-            return count switch
-            {
-                0 => "No match on the current page.",
-                1 => "1 match - highlighted in the browser.",
-                _ => $"{count} matches - the first one is highlighted. Consider a tighter selector."
-            };
-        }
-        catch (Exception ex)
-        {
-            return "Selector error: " + ex.Message;
-        }
-    }
+        if (_attached is null)
+            return "Record in one of your open pages first - selectors are tested against a real page.";
 
-    public static ILocator Resolve(IPage page, string selector, IReadOnlyList<string>? frameChain)
-    {
-        if (frameChain is null || frameChain.Count == 0) return page.Locator(selector);
+        var answer = await _attached.RequestAsync("highlight",
+            new { selector, frames = frameChain ?? Array.Empty<string>() }, TimeSpan.FromSeconds(10));
 
-        // Take the first matching frame at each level. A recorded chain can still be ambiguous
-        // on a page carrying several hidden iframes, and acting on one beats refusing to run.
-        var frame = page.Locator(frameChain[0]).First.ContentFrame;
-        for (var i = 1; i < frameChain.Count; i++)
-            frame = frame.Locator(frameChain[i]).First.ContentFrame;
-        return frame.Locator(selector);
-    }
+        if (answer is null) return "The page did not answer.";
 
-    private void WirePage(IPage page)
-    {
-        page.FrameNavigated += (_, frame) =>
+        if (!answer.Value.TryGetProperty("result", out var result))
+            return "The page did not answer.";
+
+        if (result.TryGetProperty("error", out var err) && err.ValueKind == System.Text.Json.JsonValueKind.String)
+            return err.GetString() ?? "That selector could not be resolved.";
+
+        var count = result.TryGetProperty("count", out var c) ? c.GetInt32() : 0;
+        var shown = result.TryGetProperty("visible", out var v) ? v.GetInt32() : 0;
+
+        return count switch
         {
-            if (frame.ParentFrame is not null) return;
-            OnNavigated(frame.Url);
-        };
-        page.Close += (_, _) =>
-        {
-            // The closing page is often still listed here, so ask each one whether it is gone
-            // rather than waiting for the collection to empty.
-            if (_context is not null && _context.Pages.All(p => p.IsClosed)) OnBrowserGone();
+            0 => "Nothing matched.",
+            1 when shown == 1 => "Matched exactly one element, highlighted in your page.",
+            1 => "Matched one element, but it is not visible.",
+            _ => $"{count} elements matched, {shown} of them visible. The first visible one is highlighted."
         };
     }
 
-    private void OnBrowserGone()
-    {
-        // StopAsync does its own commit; don't race it from the disconnect event.
-        if (_stopping || State == RecorderState.Stopped) return;
 
-        var saved = Commit();
-        State = RecorderState.Stopped;
-        PickAction = null;
-        StatusMessage = Describe(saved, "Browser closed.");
-        _page = null;
-        _context = null;
-        _browser = null;
-        Raise();
-        if (saved > 0) Committed?.Invoke(saved);
-    }
+
 
     private async Task TearDownAsync()
     {
-        try { if (_context is not null) await _context.CloseAsync(); } catch { /* already gone */ }
-        try { if (_browser is not null) await _browser.CloseAsync(); } catch { /* already gone */ }
-        _page = null;
-        _context = null;
-        _browser = null;
+        if (_attached is not null)
+        {
+            // The user's own tab - let go of it, never close it.
+            _attached.Message -= OnRecorderMessage;
+            _pages?.Release(_attached.Id);
+            _attached = null;
+        }
+
     }
 
     // ------------------------------------------------------------------ incoming events
@@ -538,39 +461,6 @@ public sealed class RecorderService : IAsyncDisposable
         return "https://" + url;
     }
 
-    /// <summary>
-    /// Runs a scenario properly - results, timings, history - but in the window that is already
-    /// open, rather than launching a second one. Capture is paused so the run is not recorded.
-    /// </summary>
-    public async Task<RunResult?> RunHereAsync(Scenario scenario, int startIndex = 0)
-    {
-        if (_page is null || !IsLive) return null;
-        if (IsPlaying) return null;
-
-        var resumeAfter = State == RecorderState.Recording;
-        IsPlaying = true;
-        try
-        {
-            await BroadcastModeAsync("paused");
-            State = RecorderState.Paused;
-            StatusMessage = "Running in this window…";
-            Raise();
-
-            return await _runner.RunInSessionAsync(_page, scenario, startIndex,
-                progress: message => { StatusMessage = message; Raise(); });
-        }
-        finally
-        {
-            IsPlaying = false;
-            if (resumeAfter && IsLive)
-            {
-                await BroadcastModeAsync("record");
-                State = RecorderState.Recording;
-                StatusMessage = "Recording. The window is yours again.";
-            }
-            Raise();
-        }
-    }
 
     // ------------------------------------------------------------------ editing helpers
 

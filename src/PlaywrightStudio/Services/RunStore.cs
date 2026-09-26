@@ -1,3 +1,4 @@
+﻿using System.Collections.Concurrent;
 using System.Text.Json;
 using PlaywrightStudio.Models;
 
@@ -15,6 +16,16 @@ public class RunStore
     }
 
     public event Action? Changed;
+
+    /// <summary>
+    /// Runs being written to right now. Clearing history while one is in flight would pull the
+    /// folder out from under it mid-screenshot.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, byte> _active = new();
+
+    public void MarkActive(string runId) => _active[runId] = 1;
+    public void MarkFinished(string runId) => _active.TryRemove(runId, out _);
+    public bool IsActive(string runId) => _active.ContainsKey(runId);
 
     private string FileFor(string runId) => Path.Combine(_paths.RunFolder(runId), "run.json");
 
