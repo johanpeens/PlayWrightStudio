@@ -2,6 +2,7 @@
 @inject ScenarioStore Store
 @inject RecorderService Recorder
 @inject PageSessions Pages
+@inject ActiveScenario Active
 @inject PageRunner PageRun
 @inject SettingsService Settings
 @inject NavigationManager Nav
@@ -142,71 +143,6 @@ else
                 }
             </MudPaper>
 
-
-            @* ------------------------------------------------- pages that called home *@
-            @* Nothing is launched here. A page appears in this list because it loaded the
-               studio's script and opened a socket - the user browsed to it themselves. *@
-            <MudPaper Outlined="true" Class="pa-3 mb-3">
-                <div class="d-flex align-center mb-1">
-                    <MudText Typo="Typo.subtitle2">Your open pages</MudText>
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="ml-2">
-                        @Pages.All().Count connected
-                    </MudChip>
-                    <MudSpacer />
-                    <MudButton Size="Size.Small" Variant="Variant.Text"
-                               StartIcon="@Icons.Material.Filled.Code" OnClick="@(() => _showSnippet = !_showSnippet)">
-                        How do I connect a page?
-                    </MudButton>
-                </div>
-
-                @if (_showSnippet)
-                {
-                    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
-                        Add this one line to the app you want to test, in its development build.
-                        Nothing is installed, and the studio never opens a browser.
-                    </MudText>
-                    <pre class="code-block mb-2">&lt;script src="@(Nav.BaseUri)pws.js"&gt;&lt;/script&gt;</pre>
-                }
-
-                @if (Pages.All().Count == 0)
-                {
-                    <MudText Typo="Typo.body2" Class="mud-text-secondary">
-                        No pages yet. Open the app you are testing in another tab - once it loads the
-                        script above it shows up here.
-                    </MudText>
-                }
-                else
-                {
-                    @foreach (var tab in Pages.All())
-                    {
-                        <div class="d-flex align-center gap-2 py-1 flex-wrap">
-                            <MudIcon Icon="@Icons.Material.Filled.Tab" Size="Size.Small"
-                                     Color="@(tab.IsClaimed ? Color.Primary : Color.Default)" />
-                            <div style="min-width:0;flex:1 1 240px">
-                                <MudText Typo="Typo.body2" Class="text-truncate">@tab.Title</MudText>
-                                <MudText Typo="Typo.caption" Class="mud-text-secondary mono text-truncate d-block">
-                                    @tab.Url
-                                </MudText>
-                            </div>
-                            @if (tab.IsClaimed)
-                            {
-                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">in use</MudChip>
-                            }
-                            else
-                            {
-                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
-                                           StartIcon="@Icons.Material.Filled.FiberManualRecord"
-                                           Disabled="@(Recorder.IsLive || PageRun.IsRunning)"
-                                           OnClick="@(() => RecordOnAsync(tab))">Record here</MudButton>
-                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
-                                           StartIcon="@Icons.Material.Filled.PlayArrow"
-                                           Disabled="@(PageRun.IsRunning || _scenario.EnabledStepCount == 0)"
-                                           OnClick="@(() => RunOnAsync(tab))">Run here</MudButton>
-                            }
-                        </div>
-                    }
-                }
-            </MudPaper>
 
             @* ------------------------------------------------------------ steps *@
             <MudPaper Outlined="true" Class="pa-0">
@@ -482,7 +418,15 @@ else
         PageRun.Changed += OnChanged;
     }
 
-    protected override void OnParametersSet() => _scenario = Store.Get(Id);
+    protected override void OnParametersSet()
+    {
+        _scenario = Store.Get(Id);
+
+        // Registered here, not in OnInitialized: that runs first, before Id has been bound and
+        // the scenario loaded, so there would be nothing to register.
+        if (_scenario is not null) Active.Set(_scenario, RecordOnAsync, RunOnAsync);
+        else Active.Clear();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -522,6 +466,7 @@ else
         
         Pages.Changed -= OnChanged;
         PageRun.Changed -= OnChanged;
+        Active.Clear();
         Pages.ReleaseAllFor(_circuitId);
     }
 
@@ -682,7 +627,6 @@ else
 
     // ------------------------------------------------------------------ run / save / export
 
-    private bool _showSnippet;
     private bool _waitingForTab;
     private string? _launchProblem;
     private string _launchToken = Guid.NewGuid().ToString("n");

@@ -1,0 +1,105 @@
+@inject PageSessions Pages
+@inject ActiveScenario Active
+@inject NavigationManager Nav
+@implements IDisposable
+
+@* Connected pages belong to the whole studio, not to one scenario, so they live in the app bar. *@
+@* The badge and tooltip wrap the menu rather than living inside ActivatorContent: a
+   MudIconButton in there swallows the click and the menu never opens. *@
+<MudTooltip Text="@Summary">
+    <MudBadge Content="@Pages.All().Count" Color="Color.Primary" Overlap="true"
+              Visible="@(Pages.All().Count > 0)" Bordered="true">
+        <MudMenu Icon="@Icons.Material.Filled.Tab" Color="Color.Inherit"
+                 AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                 PopoverClass="pages-popover" Dense="true">
+        <div class="pages-panel">
+            <div class="d-flex align-center mb-1">
+                <MudText Typo="Typo.subtitle2">Your open pages</MudText>
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Code" Size="Size.Small"
+                               title="How do I connect a page?"
+                               OnClick="@(() => _showSnippet = !_showSnippet)" />
+            </div>
+
+            @if (_showSnippet)
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mb-1">
+                    Add this to the app you want to test, in its development build.
+                </MudText>
+                <pre class="code-block mb-2" style="font-size:.72rem">&lt;script src="@(Nav.BaseUri)pws.js"&gt;&lt;/script&gt;</pre>
+            }
+
+            @if (Pages.All().Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Nothing connected. Press <b>Record</b> on a scenario and the studio opens a tab
+                    for you - or open an instrumented page yourself and it appears here.
+                </MudText>
+            }
+            else
+            {
+                @foreach (var tab in Pages.All())
+                {
+                    <div class="page-row">
+                        <MudIcon Icon="@Icons.Material.Filled.Tab" Size="Size.Small"
+                                 Color="@(tab.IsClaimed ? Color.Primary : Color.Default)" Class="mt-1" />
+                        <div style="min-width:0">
+                            <MudText Typo="Typo.body2" Class="text-truncate">@tab.Title</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary mono text-truncate d-block">
+                                @tab.Url
+                            </MudText>
+                        </div>
+                        <div class="d-flex align-center gap-1">
+                            @if (tab.IsClaimed)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">in use</MudChip>
+                            }
+                            else if (Active.HasScenario)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small"
+                                               Color="Color.Error" title="Record in this page"
+                                               OnClick="@(() => Active.Record!(tab))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small"
+                                               Color="Color.Primary" title="Replay in this page"
+                                               OnClick="@(() => Active.Run!(tab))" />
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+        </MudMenu>
+    </MudBadge>
+</MudTooltip>
+
+@code {
+    private bool _showSnippet;
+
+    private string Summary
+    {
+        get
+        {
+            var n = Pages.All().Count;
+            return n switch
+            {
+                0 => "No pages connected",
+                1 => "1 page connected",
+                _ => $"{n} pages connected"
+            };
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Pages.Changed += OnChanged;
+        Active.Changed += OnChanged;
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Pages.Changed -= OnChanged;
+        Active.Changed -= OnChanged;
+    }
+}

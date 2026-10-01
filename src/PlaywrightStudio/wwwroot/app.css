@@ -445,3 +445,30 @@ html, body {
     outline-offset: 2px;
     border-radius: 3px;
 }
+
+/* ---------------------------------------------------------------- connected pages */
+
+.pages-popover {
+    max-width: 440px;
+}
+
+.pages-panel {
+    padding: 12px 14px;
+    min-width: 330px;
+    max-width: 420px;
+}
+
+/* Icon, then a column that is allowed to shrink, then the actions. minmax(0,1fr) is what
+   lets a long url ellipsis rather than shoving the buttons out of the popover. */
+.page-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    border-top: 1px solid var(--mud-palette-lines-default, #262b33);
+}
+
+.page-row:first-of-type {
+    border-top: 0;
+}

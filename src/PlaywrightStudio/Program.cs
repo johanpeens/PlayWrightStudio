@@ -22,6 +22,7 @@ builder.Services.AddSingleton<ManualService>();
 builder.Services.AddSingleton<PageSessions>();
 builder.Services.AddSingleton<StudioScript>();
 builder.Services.AddScoped<PageRunner>();
+builder.Services.AddScoped<ActiveScenario>();
 
 var app = builder.Build();
 
